@@ -1,0 +1,9 @@
+**/*wandb_api_key.secret
+**/*.csv
+**/*.pkl
+wandb/
+dockerfile/
+__pycache__/
+*.pyc
+*.pyo
+README.md
