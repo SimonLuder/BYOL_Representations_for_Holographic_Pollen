@@ -1,31 +1,33 @@
+import os
+import numpy as np
+from datetime import datetime
+from tqdm import tqdm
+from typing import Optional
+from pollen_datasets.poleno import PairwiseHolographyImageFolder
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision import models
 
-import numpy as np
-from datetime import datetime
-from tqdm import tqdm
-from pollen_datasets.poleno import PairwiseHolographyImageFolder
-
 from utils import config
 from utils.wandb_utils import WandbManager
 from utils.custom_byol import BYOLWithTwoImages
 
 
-def set_single_channel_input(model, layer_name=None):
+def set_single_channel_input(model: nn.Module, layer_name: Optional[str] = None) -> nn.Module:
     """
     Update the model to accept single-channel (grayscale) input images.
     
-    Parameters:
+    Args:
         model (nn.Module): The model to modify.
         layer_name (str, optional): Name of the layer to replace. If None, will auto-detect.
         
     Returns:
-        nn.Module: Updated model.
+        torch.nn.Module: Updated model.
     """
-    def convert_conv(conv):
+    def convert_conv_to_single_channel(conv: nn.Conv2d) -> nn.Conv2d:
         new_conv = nn.Conv2d(
             in_channels=1,
             out_channels=conv.out_channels,
@@ -35,43 +37,46 @@ def set_single_channel_input(model, layer_name=None):
             dilation=conv.dilation,
             groups=conv.groups,
             bias=conv.bias is not None,
-            padding_mode=conv.padding_mode
+            padding_mode=conv.padding_mode,
+            device=conv.weight.device,
+            dtype=conv.weight.dtype,
         )
         with torch.no_grad():
             new_conv.weight[:] = conv.weight.mean(dim=1, keepdim=True)
             if conv.bias is not None:
                 new_conv.bias[:] = conv.bias
         return new_conv
+    
+    def get_parent_module(root: nn.Module, path: str):
+        parts = path.split(".")
+        for part in parts[:-1]:
+            root = getattr(root, part)
+        return root, parts[-1]
 
     if layer_name:
-        # Directly replace a named layer
-        parts = layer_name.split(".")
-        mod = model
-        for p in parts[:-1]:
-            mod = getattr(mod, p)
-        setattr(mod, parts[-1], convert_conv(getattr(mod, parts[-1])))
+        parent, attr = get_parent_module(model, layer_name)
+        setattr(parent, attr, convert_conv_to_single_channel(getattr(parent, attr)))
     else:
-        # Auto-detect and replace the first 3-channel conv layer
         for name, module in model.named_modules():
             if isinstance(module, nn.Conv2d) and module.in_channels == 3:
-                # Navigate to the parent module and replace
-                parent = model
-                subnames = name.split(".")
-                for sub in subnames[:-1]:
-                    parent = getattr(parent, sub)
-                setattr(parent, subnames[-1], convert_conv(module))
+                parent, attr = get_parent_module(model, name)
+                setattr(parent, attr, convert_conv_to_single_channel(module))
                 break
 
     return model
 
 
 class Trainer:
-    def __init__(self, model, optimizer, device, wandb_run=None):
+
+    def __init__(self, model, optimizer, device, wandb_run=None, checkpoint_dir=None, val_step=None):
         self.model = model
         self.optimizer = optimizer
         self.device = device
         self.wandb_run = wandb_run
+        self.checkpoint_dir = checkpoint_dir
         self._step = 0
+        self.best = 1e9
+        self.val_step = val_step
 
 
     def train_one_epoch(self, dataloader):
@@ -88,6 +93,7 @@ class Trainer:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+            self.model.update_moving_average()  # Update moving average of target encoder
 
             n_samples.append(im1.shape[0])
             all_losses.append(loss.item())
@@ -100,21 +106,24 @@ class Trainer:
                     )
                 self._step += 1
 
-        logs = self._compute_epoch_loss()
+            if (self.val_step is not None) and (self._step % self.val_step == 0):
+                self.validate_one_epoch(dataloader)
+
+        epoch_loss = self._compute_epoch_loss(n_samples, all_losses)
 
         # Log epoch metrics
         if self.wandb_run is not None:
             self.wandb_run.log(
-                data = {"train_epoch_loss":logs},
+                data = {"train_epoch_loss": epoch_loss},
                 step = self._step
                 )
 
     
     def validate_one_epoch(self, dataloader):
 
-        self.model.eval()
         n_samples = []
         all_losses = []
+        self.model.eval()
 
         with torch.no_grad():
             pbar = tqdm(dataloader, desc="Validation")
@@ -126,27 +135,42 @@ class Trainer:
                 n_samples.append(im1.shape[0])
                 all_losses.append(loss.item())
 
-        logs = self._compute_epoch_loss(n_samples, all_losses)
+        epoch_loss = self._compute_epoch_loss(n_samples, all_losses)
 
         # Log epoch metrics
         if self.wandb_run is not None:
             self.wandb_run.log(
-                data = {"val_epoch_loss":logs},
+                data = {"val_epoch_loss": epoch_loss},
                 step = self._step
                 )
+            
+        if epoch_loss < self.best and self.checkpoint_dir is not None:
+            self.create_model_checkpoint(name="best.pth")
     
 
     def _compute_epoch_loss(self, n_samples, all_losses):
         N = np.array(n_samples)
+        print(N)
         L = np.array(all_losses)
         epoch_loss = (L @ N) / N.sum()
-        return {"epoch_loss": epoch_loss}
+        return epoch_loss
+    
 
+    def create_model_checkpoint(self, name):
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
+        if name is None:
+            torch.save(self.model.state_dict(), 
+                       os.path.join(self.checkpoint_dir, f"{self._step}.pth"))
+        else:
+            torch.save(self.model.state_dict(), 
+                       os.path.join(self.checkpoint_dir, name))
+    
 
 def main(config_path):
 
     # Device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Device: {device}")
 
     # Configuration
     conf = config.load(config_path)
@@ -221,16 +245,24 @@ def main(config_path):
     optimizer = torch.optim.Adam(model.parameters(), lr=train_conf["lr"])
 
     # Model trainer
-    trainer = Trainer(model, optimizer, device, wandb_run)
+    checkpoint_dir = os.path.join("models", run_name)
+    val_step=train_conf["validation_step"]
+    trainer = Trainer(model, optimizer, device, wandb_run, checkpoint_dir, val_step)
 
 
     for epoch_idx in range(train_conf["num_epochs"]):
         
-        train_logs = trainer.train_one_epoch(model, optimizer, dataloader_train, device)
+        # Train one epoch
+        train_logs = trainer.train_one_epoch(dataloader_train)
         print(train_logs)
 
+        # Validate one epoch
         if dataset_conf.get("labels_val"):
-            val_logs = trainer.validate_one_epoch(model, dataloader_val, device)
+            val_logs = trainer.validate_one_epoch(dataloader_val)
+            print(val_logs)
+            
+    # Save checkpoint
+    trainer.create_model_checkpoint(name="{run_name}.pth")
 
 
 if __name__ == "__main__":
