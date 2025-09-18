@@ -69,7 +69,7 @@ def set_single_channel_input(model: nn.Module, layer_name: Optional[str] = None)
 
 class Trainer:
 
-    def __init__(self, model, optimizer, device, wandb_run=None, checkpoint_dir=None, val_step=None):
+    def __init__(self, model, optimizer, dataloader_train, dataloader_val=None, device="cpu", wandb_run=None, checkpoint_dir=None, val_step=None):
         self.model = model
         self.optimizer = optimizer
         self.device = device
@@ -78,15 +78,17 @@ class Trainer:
         self._step = 0
         self.best = 1e9
         self.val_step = val_step
+        self.dataloader_train = dataloader_train
+        self.dataloader_val = dataloader_val
 
 
-    def train_one_epoch(self, dataloader):
+    def train_one_epoch(self):
 
         self.model.train()
         n_samples = []
         all_losses = []
         
-        pbar = tqdm(dataloader, desc="Training")
+        pbar = tqdm(self.dataloader_train, desc="Training")
         for ((im1, im2), _, _) in pbar:
             im1, im2 = im1.to(self.device), im2.to(self.device)
 
@@ -108,7 +110,7 @@ class Trainer:
                 self._step += 1
 
             if (self.val_step is not None) and (self._step % self.val_step == 0):
-                self.validate_one_epoch(dataloader)
+                self.validate_one_epoch()
 
         epoch_loss = self._compute_epoch_loss(n_samples, all_losses)
 
@@ -120,14 +122,14 @@ class Trainer:
                 )
 
     
-    def validate_one_epoch(self, dataloader):
+    def validate_one_epoch(self):
 
         n_samples = []
         all_losses = []
         self.model.eval()
 
         with torch.no_grad():
-            pbar = tqdm(dataloader, desc="Validation")
+            pbar = tqdm(self.dataloader_val, desc="Validation")
             for ((im1, im2), _, _) in pbar:
                 im1, im2 = im1.to(self.device), im2.to(self.device)
 
@@ -151,7 +153,6 @@ class Trainer:
 
     def _compute_epoch_loss(self, n_samples, all_losses):
         N = np.array(n_samples)
-        print(N)
         L = np.array(all_losses)
         epoch_loss = (L @ N) / N.sum()
         return epoch_loss
@@ -248,17 +249,18 @@ def main(config_path):
     # Model trainer
     checkpoint_dir = os.path.join("models", run_name)
     val_step=train_conf["validation_step"]
-    trainer = Trainer(model, optimizer, device, wandb_run, checkpoint_dir, val_step)
+    trainer = Trainer(model, optimizer, dataloader_train, dataloader_val, 
+                      device, wandb_run, checkpoint_dir, val_step)
 
     for epoch_idx in range(train_conf["num_epochs"]):
         
         # Train one epoch
-        train_logs = trainer.train_one_epoch(dataloader_train)
+        train_logs = trainer.train_one_epoch()
         print(train_logs)
 
         # Validate one epoch
         if dataset_conf.get("labels_val"):
-            val_logs = trainer.validate_one_epoch(dataloader_val)
+            val_logs = trainer.validate_one_epoch()
             print(val_logs)
             
     # Save checkpoint
