@@ -2,6 +2,7 @@ import os
 import numpy as np
 from datetime import datetime
 from tqdm import tqdm
+import argparse
 from typing import Optional
 from pollen_datasets.poleno import PairwiseHolographyImageFolder
 
@@ -249,7 +250,6 @@ def main(config_path):
     val_step=train_conf["validation_step"]
     trainer = Trainer(model, optimizer, device, wandb_run, checkpoint_dir, val_step)
 
-
     for epoch_idx in range(train_conf["num_epochs"]):
         
         # Train one epoch
@@ -267,6 +267,8 @@ def main(config_path):
 
 if __name__ == "__main__":
 
-    config_path = "config/base_config.yaml"
+    parser = argparse.ArgumentParser(description='Path of the configuration file.')
+    parser.add_argument('--config', default='config/base_config.yaml', type=str)
+    args = parser.parse_args()
 
-    main(config_path)
+    main(args.config)
