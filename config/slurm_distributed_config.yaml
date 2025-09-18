@@ -1,0 +1,18 @@
+dataset :
+  root : "data/Poleno/"                                 # root folder of the dataset
+  img_channels : 1                                      # grayscale images
+  img_size : 200                                        # original image size
+  img_interpolation : 256                               # size after interpolation or "Null"
+  labels_train : labels_train.csv                       # training labels
+  labels_val : labels_mini.csv                           # validation labels
+  labels_test : labels_test.csv                         # test labels
+  filenames : filenames                                 # column name containing filenames
+  img_path : filenames                                  # column name containing relative image path from root
+
+training :
+  lr : 0.0003
+  batch_size : 64
+  num_epochs : 5
+  validation_step : 100
+  num_nodes : 1
+  num_devices : 2
