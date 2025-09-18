@@ -1,15 +1,16 @@
 dataset :
-  root : "Z:/marvel/marvel-fhnw/data/Poleno/"       # root folder of the dataset
-  img_channels : 1                                  # grayscale images
-  img_size : 200                                    # original image size
-  img_interpolation : 256                           # size after interpolation or "Null"
-  labels_train : labels_mini.csv                    # training labels
-  labels_val : /labels_mini.csv                     # validation labels
-  # labels_test : /labels_test.csv                  # test labels
-  filenames : filenames                             # column name containing filenames
-  img_path : filenames                              # column name containing relative image path from root
+  root : "Z:/marvel/marvel-fhnw/data/Poleno/"                     # root folder of the dataset
+  img_channels : 1                                                # grayscale images
+  img_size : 200                                                  # original image size
+  img_interpolation : 256                                         # size after interpolation or "Null"
+  labels_train : ./data/processed/poleno/computed_data_full.csv   # training labels
+  labels_val : ./labels_mini.csv                                  # validation labels
+  # labels_test : /labels_test.csv                                # test labels
+  filenames : filenames                                           # column name containing filenames
+  img_path : filenames                                            # column name containing relative image path from root
 
 training :
-  batch_size : 16
-  num_epochs : 10
-  lr : 0.0003
+  lr : 0.0001
+  batch_size : 8
+  num_epochs : 5
+  validation_step : 100
