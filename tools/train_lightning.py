@@ -38,7 +38,6 @@ class BYOLLightningModule(pl.LightningModule):
         (im1, im2), _, _ = batch
         loss = self.model(x1=im1, x2=im2)
         self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
-        self.model.update_moving_average()
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -49,6 +48,10 @@ class BYOLLightningModule(pl.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
+    
+    def on_before_zero_grad(self, _):
+        if self.model.use_momentum:
+            self.model.update_moving_average()
 
 
 def main(config_path):
@@ -153,12 +156,14 @@ def main(config_path):
     trainer = pl.Trainer(
         max_epochs=train_conf["num_epochs"],
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
-        strategy="ddp" if torch.cuda.device_count() > 1 else None,
+        strategy="ddp" if torch.cuda.device_count() > 1 else "auto",
         num_nodes=train_conf.get("num_nodes", 1),
         devices=train_conf.get("num_devices", 1),
         callbacks=[checkpoint_callback],
         logger=wandb_logger,
         log_every_n_steps=50,
+        val_check_interval=train_conf.get("validation_step", 100),
+        sync_batchnorm=True if torch.cuda.device_count() > 1 else False,
     )
 
     # Fit
@@ -167,6 +172,6 @@ def main(config_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Path of the configuration file.")
-    parser.add_argument("--config", default="config/base_config.yaml", type=str)
+    parser.add_argument("--config", default="config/base_distributed_config.yaml", type=str)
     args = parser.parse_args()
     main(args.config)
