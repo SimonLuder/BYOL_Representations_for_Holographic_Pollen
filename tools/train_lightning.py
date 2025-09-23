@@ -144,7 +144,7 @@ def main(config_path):
         mode="min",
     )
 
-    print(f"Training with {train_conf.get('num_nodes', 1) * train_conf['batch_size'] * train_conf['num_devices'] * train_conf["accumulate_grad_batches"]} global batch size.")
+    print(f"Training with {train_conf.get('num_nodes', 1) * train_conf['batch_size'] * train_conf['num_devices'] * train_conf['accumulate_grad_batches']} global batch size.")
     print("Num_devices:", torch.cuda.device_count())
 
     # Trainer
