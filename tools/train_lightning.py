@@ -21,17 +21,17 @@ from utils.model_setup import set_single_channel_input
 
 
 class BYOLLightningModule(pl.LightningModule):
-    def __init__(self, backbone, image_size, image_channels, lr, wandb_run=None):
+    def __init__(self, backbone, image_size, image_channels, lr):
         super().__init__()
         self.model = BYOLWithTwoImages(
             backbone,
             image_size=image_size,
             image_channels=image_channels,
             augment_fn=torch.nn.Identity(),
-            hidden_layer="avgpool"
+            hidden_layer="avgpool",
+            sync_batchnorm=True if torch.cuda.device_count() > 1 else False,
         )
         self.lr = lr
-        self.wandb_run = wandb_run
         self.best_val_loss = float("inf")
 
     def training_step(self, batch, batch_idx):
@@ -62,12 +62,6 @@ def main(config_path):
 
     # Logging with WandB
     run_name = f"byol_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    # wandb_manager = WandbManager(
-    #     project="ByolHolographicPollen",
-    #     run_name=run_name,
-    #     config=train_conf
-    # )
-    # wandb_run = wandb_manager.get_run()
     wandb_logger = WandbLogger(
         project="ByolHolographicPollen",
         name=run_name,
@@ -151,6 +145,7 @@ def main(config_path):
     )
 
     print(f"Training with {train_conf.get('num_nodes', 1) * train_conf['batch_size'] * train_conf['num_devices']} global batch size.")
+    print("Num_devices:", torch.cuda.device_count())
 
     # Trainer
     trainer = pl.Trainer(

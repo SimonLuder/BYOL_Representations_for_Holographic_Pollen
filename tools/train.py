@@ -3,11 +3,9 @@ import numpy as np
 from datetime import datetime
 from tqdm import tqdm
 import argparse
-from typing import Optional
 from pollen_datasets.poleno import PairwiseHolographyImageFolder
 
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision import models
@@ -62,6 +60,7 @@ class Trainer:
 
             if (self.val_step is not None) and (self._step % self.val_step == 0):
                 self.validate_one_epoch()
+                self.model.train()
 
         epoch_loss = self._compute_epoch_loss(n_samples, all_losses)
 
