@@ -144,14 +144,14 @@ def main(config_path):
         mode="min",
     )
 
-    print(f"Training with {train_conf.get('num_nodes', 1) * train_conf['batch_size'] * train_conf['num_devices']} global batch size.")
+    print(f"Training with {train_conf.get('num_nodes', 1) * train_conf['batch_size'] * train_conf['num_devices'] * train_conf["accumulate_grad_batches"]} global batch size.")
     print("Num_devices:", torch.cuda.device_count())
 
     # Trainer
     trainer = pl.Trainer(
         max_epochs=train_conf["num_epochs"],
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
-        strategy="ddp" if torch.cuda.device_count() > 1 else "auto",
+        strategy="ddp_find_unused_parameters_true" if torch.cuda.device_count() > 1 else "auto",
         num_nodes=train_conf.get("num_nodes", 1),
         devices=train_conf.get("num_devices", 1),
         callbacks=[checkpoint_callback],
@@ -159,6 +159,7 @@ def main(config_path):
         log_every_n_steps=50,
         val_check_interval=train_conf.get("validation_step", 100),
         sync_batchnorm=True if torch.cuda.device_count() > 1 else False,
+        accumulate_grad_batches=train_conf.get("accumulate_grad_batches", 1),
     )
 
     # Fit

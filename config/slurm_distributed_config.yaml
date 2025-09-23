@@ -16,3 +16,4 @@ training :
   validation_step : 100
   num_nodes : 1
   num_devices : 2
+  accumulate_grad_batches : 4
