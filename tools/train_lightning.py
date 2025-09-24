@@ -155,8 +155,9 @@ def main(config_path):
         * train_conf.get("num_nodes", 1)
         )
 
-    wandb_logger.experiment.config.update({
-        "global_batch_size": global_batch_size
+    wandb_logger.log_hyperparams({
+    **train_conf,
+    "global_batch_size": global_batch_size
     })
     
     print(f"✅ Global batch size: {global_batch_size}")
