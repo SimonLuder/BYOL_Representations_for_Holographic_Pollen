@@ -15,7 +15,6 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 
 from utils import config
-from utils.wandb_utils import WandbManager
 from utils.custom_byol import BYOLWithTwoImages
 from utils.model_setup import set_single_channel_input
 
@@ -55,13 +54,16 @@ class BYOLLightningModule(pl.LightningModule):
 
 
 def main(config_path):
+
     # Config
     conf = config.load(config_path)
     dataset_conf = conf["dataset"]
     train_conf = conf["training"]
 
+    pl.seed_everything(42, workers=True)
+
     # Logging with WandB
-    run_name = f"byol_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    run_name = f"byol_lightning_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     wandb_logger = WandbLogger(
         project="ByolHolographicPollen",
         name=run_name,
@@ -78,12 +80,14 @@ def main(config_path):
                 interpolation=transforms.InterpolationMode.BILINEAR,
             )
         )
+
     transforms_list.append(
         transforms.Normalize(
             (0.5,) * dataset_conf["img_channels"],
             (0.5,) * dataset_conf["img_channels"],
         )
     )
+
     transform = transforms.Compose(transforms_list)
 
     # Datasets
@@ -144,7 +148,18 @@ def main(config_path):
         mode="min",
     )
 
-    print(f"Training with {train_conf.get('num_nodes', 1) * train_conf['batch_size'] * train_conf['num_devices'] * train_conf['accumulate_grad_batches']} global batch size.")
+    global_batch_size = (
+        train_conf["batch_size"]
+        * train_conf.get("accumulate_grad_batches", 1)
+        * train_conf.get("num_devices", 1)
+        * train_conf.get("num_nodes", 1)
+        )
+
+    wandb_logger.experiment.config.update({
+        "global_batch_size": global_batch_size
+    })
+    
+    print(f"✅ Global batch size: {global_batch_size}")
     print("Num_devices:", torch.cuda.device_count())
 
     # Trainer
