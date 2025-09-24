@@ -142,7 +142,7 @@ def main(config_path):
     checkpoint_dir = os.path.join("models", run_name)
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=checkpoint_dir,
-        filename="{epoch}-{val_loss:.4f}",
+        filename="{epoch}-{step}-{val_loss:.4f}",
         save_top_k=1,
         monitor="val_loss",
         mode="min",
@@ -173,7 +173,7 @@ def main(config_path):
         callbacks=[checkpoint_callback],
         logger=wandb_logger,
         log_every_n_steps=50,
-        val_check_interval=train_conf.get("validation_step", 100),
+        val_check_interval=train_conf.get("validation_step", 100) * train_conf["accumulate_grad_batches"], # Global steps
         sync_batchnorm=True if torch.cuda.device_count() > 1 else False,
         accumulate_grad_batches=train_conf.get("accumulate_grad_batches", 1),
     )
