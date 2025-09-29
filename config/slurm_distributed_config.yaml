@@ -12,8 +12,8 @@ dataset :
 training :
   lr : 0.0003
   batch_size : 64
-  num_epochs : 5
+  num_epochs : 50
   validation_step : 100
   num_nodes : 2
   num_devices : 2
-  accumulate_grad_batches : 4
+  accumulate_grad_batches : 8
