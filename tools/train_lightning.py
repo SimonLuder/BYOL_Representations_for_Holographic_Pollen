@@ -36,13 +36,13 @@ class BYOLLightningModule(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         (im1, im2), _, _ = batch
         loss = self.model(x1=im1, x2=im2)
-        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True)
+        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         (im1, im2), _, _ = batch
         loss = self.model(x1=im1, x2=im2)
-        self.log("val_loss", loss, prog_bar=True, on_epoch=True)
+        self.log("val_loss", loss, prog_bar=True, on_epoch=True, sync_dist=True)
         return loss
 
     def configure_optimizers(self):
@@ -146,6 +146,7 @@ def main(config_path):
         save_top_k=1,
         monitor="val_loss",
         mode="min",
+        save_last=True,
     )
 
     global_batch_size = (
