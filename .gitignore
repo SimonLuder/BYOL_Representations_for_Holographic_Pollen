@@ -8,3 +8,6 @@ __pycache__/
 *.pyo
 
 models/
+images/
+
+*.npz

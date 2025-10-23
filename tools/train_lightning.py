@@ -1,13 +1,9 @@
 import os
-import numpy as np
 from datetime import datetime
-from tqdm import tqdm
 import argparse
-from typing import Optional
 from pollen_datasets.poleno import PairwiseHolographyImageFolder
 
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision import models
@@ -90,6 +86,12 @@ def main(config_path):
 
     transform = transforms.Compose(transforms_list)
 
+    # Check if labels fies exist
+    if not os.path.isfile(dataset_conf["labels_train"]):
+        raise FileNotFoundError(f'File {dataset_conf["labels_train"]} does not exist')
+    if not os.path.isfile(dataset_conf["labels_val"]):
+        raise FileNotFoundError(f'File {dataset_conf["labels_val"]} does not  exist')
+
     # Datasets
     dataset_train = PairwiseHolographyImageFolder(
         root=dataset_conf["root"],
@@ -127,7 +129,7 @@ def main(config_path):
         )
 
     # Backbone
-    backbone = models.resnet50(weights=None)
+    backbone = models.resnet18(weights=None)
     backbone = set_single_channel_input(backbone)
 
     # Lightning model
