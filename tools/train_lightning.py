@@ -129,7 +129,7 @@ def main(config_path):
         )
 
     # Backbone
-    backbone = models.resnet18(weights=None)
+    backbone = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
     backbone = set_single_channel_input(backbone)
 
     # Lightning model

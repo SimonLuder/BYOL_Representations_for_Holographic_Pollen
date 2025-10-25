@@ -10,10 +10,11 @@ dataset :
   img_path : filenames                                  # column name containing relative image path from root
 
 training :
-  lr : 0.0003
+  lr : 0.0005
   batch_size : 64
-  num_epochs : 50
-  validation_step : 100
+  num_epochs : 80
+  validation_step : 1000
   num_nodes : 2
   num_devices : 2
   accumulate_grad_batches : 8
+  ema : 0.99                                            # exponential moving average decay for target network 
