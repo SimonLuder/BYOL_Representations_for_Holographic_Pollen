@@ -15,3 +15,6 @@ training :
   num_epochs : 5
   validation_step : 100
 
+byol:
+  backbone : "resnet18"                                 # backbone architecture
+  ema : 0.99                                            # exponential moving average decay for target network 

@@ -1,4 +1,5 @@
 import os
+import shutil
 from datetime import datetime
 import argparse
 from pollen_datasets.poleno import PairwiseHolographyImageFolder
@@ -12,7 +13,7 @@ from pytorch_lightning.loggers import WandbLogger
 
 from utils import config
 from utils.custom_byol import BYOLWithTwoImages
-from utils.model_setup import set_single_channel_input
+from model.backbones import get_backbone, set_single_channel_input
 
 
 class BYOLLightningModule(pl.LightningModule):
@@ -55,6 +56,7 @@ def main(config_path):
     conf = config.load(config_path)
     dataset_conf = conf["dataset"]
     train_conf = conf["training"]
+    model_conf = conf["byol"]
 
     pl.seed_everything(42, workers=True)
 
@@ -129,7 +131,7 @@ def main(config_path):
         )
 
     # Backbone
-    backbone = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+    backbone = get_backbone(model_conf["backbone"], pretrained=False)
     backbone = set_single_channel_input(backbone)
 
     # Lightning model
@@ -141,7 +143,7 @@ def main(config_path):
     )
 
     # Callbacks
-    checkpoint_dir = os.path.join("models", run_name)
+    checkpoint_dir = os.path.join("checkpoints", run_name)
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=checkpoint_dir,
         filename="{epoch}-{step}-{val_loss:.4f}",
@@ -162,7 +164,12 @@ def main(config_path):
     **train_conf,
     "global_batch_size": global_batch_size
     })
-    
+
+    # Save config file to checkpoint directory
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    destination = os.path.join(checkpoint_dir, os.path.basename(config_path))
+    shutil.copy2(config_path, destination)
+
     print(f"✅ Global batch size: {global_batch_size}")
     print("Num_devices:", torch.cuda.device_count())
 

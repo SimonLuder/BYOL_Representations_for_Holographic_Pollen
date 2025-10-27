@@ -1,6 +1,35 @@
+
 import torch
 import torch.nn as nn
 from typing import Optional
+from torchvision import models
+
+
+def get_backbone(name: str, pretrained: bool = True):
+    """
+    Returns a torchvision backbone given its name.
+    
+    Args:
+        name (str): Model name, e.g. 'resnet18', 'resnet50', 'mobilenet_v3_small'.
+        pretrained (bool): Whether to use pretrained ImageNet weights.
+    
+    Returns:
+        torch.nn.Module: The model backbone.
+    """
+    # Mapper for torchvision constructors and weights
+    backbone_constructors = {
+        "resnet18": (models.resnet18, models.ResNet18_Weights.DEFAULT),
+        "resnet34": (models.resnet34, models.ResNet34_Weights.DEFAULT),
+        "resnet50": (models.resnet50, models.ResNet50_Weights.DEFAULT),
+    } # Add more models as needed
+
+    if name not in backbone_constructors:
+        raise ValueError(f"Unsupported backbone '{name}'. Available: {list(backbone_constructors.keys())}")
+    
+    constructor, weights = backbone_constructors[name]
+    model = constructor(weights=weights if pretrained else None)
+    return model
+    
 
 def set_single_channel_input(model: nn.Module, layer_name: Optional[str] = None) -> nn.Module:
     """
