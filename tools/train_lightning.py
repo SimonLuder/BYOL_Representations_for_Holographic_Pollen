@@ -10,6 +10,7 @@ from torchvision import transforms
 from torchvision import models
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
+from lightning.pytorch.strategies import DDPStrategy
 
 from utils import config
 from utils.custom_byol import BYOLWithTwoImages
@@ -33,13 +34,27 @@ class BYOLLightningModule(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         (im1, im2), _, _ = batch
         loss = self.model(x1=im1, x2=im2)
-        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, sync_dist=True)
+        self.log(
+            "train_loss", 
+            loss, prog_bar=True, 
+            on_step=True, 
+            on_epoch=True, 
+            sync_dist=True,
+            batch_size=im1.size(0),
+        )
         return loss
 
     def validation_step(self, batch, batch_idx):
         (im1, im2), _, _ = batch
         loss = self.model(x1=im1, x2=im2)
-        self.log("val_loss", loss, prog_bar=True, on_epoch=True, sync_dist=True)
+        self.log(
+            "val_loss", 
+            loss, 
+            prog_bar=False, 
+            on_epoch=True, 
+            sync_dist=True,
+            batch_size=im1.size(0),
+        )
         return loss
 
     def configure_optimizers(self):
@@ -119,6 +134,7 @@ def main(config_path):
         shuffle=True,
         num_workers=4,
         pin_memory=True,
+        drop_last=True,
     )
     dataloader_val = None
     if dataset_val:
@@ -128,6 +144,7 @@ def main(config_path):
             shuffle=False,
             num_workers=4,
             pin_memory=True,
+            drop_last=True,
         )
 
     # Backbone
@@ -173,11 +190,21 @@ def main(config_path):
     print(f"✅ Global batch size: {global_batch_size}")
     print("Num_devices:", torch.cuda.device_count())
 
+    if torch.cuda.device_count() > 1:
+        strategy = DDPStrategy(
+            find_unused_parameters=False,
+            gradient_as_bucket_view=True,
+        static_graph=True,
+        timeout=datetime.timedelta(minutes=10),
+        )
+    else:
+        strategy = "auto"
+
     # Trainer
     trainer = pl.Trainer(
         max_epochs=train_conf["num_epochs"],
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
-        strategy="ddp_find_unused_parameters_true" if torch.cuda.device_count() > 1 else "auto",
+        strategy=strategy,
         num_nodes=train_conf.get("num_nodes", 1),
         devices=train_conf.get("num_devices", 1),
         callbacks=[checkpoint_callback],
