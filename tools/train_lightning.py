@@ -1,6 +1,6 @@
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 import argparse
 from pollen_datasets.poleno import PairwiseHolographyImageFolder
 
@@ -10,7 +10,7 @@ from torchvision import transforms
 from torchvision import models
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
-from lightning.pytorch.strategies import DDPStrategy
+from pytorch_lightning.strategies import DDPStrategy
 
 from utils import config
 from utils.custom_byol import BYOLWithTwoImages
@@ -192,10 +192,8 @@ def main(config_path):
 
     if torch.cuda.device_count() > 1:
         strategy = DDPStrategy(
-            find_unused_parameters=False,
-            gradient_as_bucket_view=True,
-        static_graph=True,
-        timeout=datetime.timedelta(minutes=10),
+            find_unused_parameters=True,
+            timeout=timedelta(minutes=10),
         )
     else:
         strategy = "auto"
