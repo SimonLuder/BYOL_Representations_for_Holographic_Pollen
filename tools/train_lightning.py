@@ -34,27 +34,21 @@ class BYOLLightningModule(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         (im1, im2), _, _ = batch
         loss = self.model(x1=im1, x2=im2)
-        self.log(
-            "train_loss", 
-            loss, prog_bar=True, 
-            on_step=True, 
-            on_epoch=True, 
-            sync_dist=True,
-            batch_size=im1.size(0),
-        )
+
+        local_bs = im1.size(0)
+
+        # Log loss and training samples seen
+        self.log("train_loss", loss, on_step=True, on_epoch=True, sync_dist=True, batch_size=local_bs)
         return loss
 
     def validation_step(self, batch, batch_idx):
         (im1, im2), _, _ = batch
         loss = self.model(x1=im1, x2=im2)
-        self.log(
-            "val_loss", 
-            loss, 
-            prog_bar=False, 
-            on_epoch=True, 
-            sync_dist=True,
-            batch_size=im1.size(0),
-        )
+
+        local_bs = im1.size(0)
+
+        # Log validation loss
+        self.log("val_loss", loss, on_step=False, on_epoch=True, sync_dist=True, batch_size=local_bs)
         return loss
 
     def configure_optimizers(self):
@@ -133,6 +127,7 @@ def main(config_path):
         batch_size=train_conf["batch_size"],
         shuffle=True,
         num_workers=4,
+        persistent_workers=True,
         pin_memory=True,
         drop_last=True,
     )
@@ -143,6 +138,7 @@ def main(config_path):
             batch_size=train_conf["batch_size"],
             shuffle=False,
             num_workers=4,
+            persistent_workers=True,
             pin_memory=True,
             drop_last=True,
         )
