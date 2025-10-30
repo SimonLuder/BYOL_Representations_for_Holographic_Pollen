@@ -18,14 +18,20 @@ from model.backbones import get_backbone, set_single_channel_input
 
 
 class BYOLLightningModule(pl.LightningModule):
-    def __init__(self, backbone, image_size, image_channels, lr):
+    def __init__(self, backbone, image_size, image_channels, hidden_layer="avgpool", projection_size=256, projection_hidden_size=4096, 
+                 augment_fn=torch.nn.Identity(), augment_fn2=None, moving_average_decay=0.99, use_momentum=True, lr=3e-4):
         super().__init__()
         self.model = BYOLWithTwoImages(
             backbone,
             image_size=image_size,
             image_channels=image_channels,
-            augment_fn=torch.nn.Identity(),
-            hidden_layer="avgpool",
+            hidden_layer=hidden_layer,
+            projection_size=projection_size,
+            projection_hidden_size=projection_hidden_size,
+            augment_fn=augment_fn,
+            augment_fn2 = augment_fn2, 
+            moving_average_decay=moving_average_decay,
+            use_momentum=use_momentum,
             sync_batchnorm=True if torch.cuda.device_count() > 1 else False,
         )
         self.lr = lr
@@ -144,7 +150,7 @@ def main(config_path):
         )
 
     # Backbone
-    backbone = get_backbone(model_conf["backbone"], pretrained=False)
+    backbone = get_backbone(model_conf["backbone"], pretrained=model_conf["pretrained"])
     backbone = set_single_channel_input(backbone)
 
     # Lightning model
@@ -152,17 +158,32 @@ def main(config_path):
         backbone=backbone,
         image_size=dataset_conf.get("img_interpolation", dataset_conf["img_size"]),
         image_channels=dataset_conf.get("img_channels", 1),
+        hidden_layer=model_conf.get("hidden_layer", "avgpool"),
+        projection_size=model_conf.get("projection_size", 256),
+        projection_hidden_size=model_conf.get("projection_hidden_size", 4096),
+        augment_fn=torch.nn.Identity(),
+        augment_fn2=None,
+        moving_average_decay=model_conf.get("moving_average_decay", 0.99),
+        use_momentum=model_conf.get("use_momentum", True),
         lr=train_conf["lr"],
     )
 
     # Callbacks
     checkpoint_dir = os.path.join("checkpoints", run_name)
-    checkpoint_callback = pl.callbacks.ModelCheckpoint(
+    best_checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=checkpoint_dir,
-        filename="{epoch}-{step}-{val_loss:.4f}",
-        save_top_k=1,
+        filename="best_{epoch}-{step}-{val_loss:.4f}",
+        save_top_k=3,
         monitor="val_loss",
         mode="min",
+        save_last=True,
+    )
+
+    epoch_checkpoint_callback = pl.callbacks.ModelCheckpoint(
+        dirpath=checkpoint_dir,
+        filename="epoch_{epoch}-{step}-{val_loss:.4f}",
+        save_top_k=-1,               
+        every_n_epochs=10,            
         save_last=True,
     )
 
@@ -201,7 +222,7 @@ def main(config_path):
         strategy=strategy,
         num_nodes=train_conf.get("num_nodes", 1),
         devices=train_conf.get("num_devices", 1),
-        callbacks=[checkpoint_callback],
+        callbacks=[best_checkpoint_callback, epoch_checkpoint_callback],
         logger=wandb_logger,
         log_every_n_steps=50,
         val_check_interval=train_conf.get("validation_step", 100) * train_conf["accumulate_grad_batches"], # Global steps

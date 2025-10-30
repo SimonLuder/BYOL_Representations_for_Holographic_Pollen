@@ -1,3 +1,5 @@
+comment: ""
+
 dataset :
   root : "Z:/marvel/marvel-fhnw/data/Poleno/"                   # root folder of the dataset
   img_channels : 1                                              # grayscale images
@@ -10,7 +12,7 @@ dataset :
   img_path : filenames                                          # column name containing relative image path from root
 
 training :
-  lr : 0.0003
+  lr : 0.00005
   batch_size : 8
   num_epochs : 5
   validation_step : 10
@@ -20,4 +22,9 @@ training :
 
 byol:
   backbone : "resnet18"                                 # backbone architecture
-  ema : 0.99                                            # exponential moving average decay for target network 
+  pretrained : False                                    # load backbone pretrained if True
+  hidden_layer : "avgpool"                              # layer from which to extract features in backbone
+  projection_size : 256                                 # size of the projection output
+  projection_hidden_size : 4096                         # size of the hidden layer in the projection MLP
+  moving_average_decay : 0.99                           # exponential moving average decay for target network
+  use_momentum : True                                   # whether to use momentum encoder
