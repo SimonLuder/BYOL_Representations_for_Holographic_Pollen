@@ -74,13 +74,21 @@ def main(config_path):
     model_conf = conf["byol"]
 
     pl.seed_everything(42, workers=True)
-
+   
     # Logging with WandB
+    conf_flat = {}
+    for section_name, section_conf in conf.items():
+        if isinstance(section_conf, dict):
+            for k, v in section_conf.items():
+                conf_flat[f"{section_name}.{k}"] = v
+        else:
+            conf_flat[section_name] = section_conf
+
     run_name = f"byol_lightning_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     wandb_logger = WandbLogger(
         project="ByolHolographicPollen",
         name=run_name,
-        config=train_conf,
+        config=conf_flat,
     )
 
     # Transformations
