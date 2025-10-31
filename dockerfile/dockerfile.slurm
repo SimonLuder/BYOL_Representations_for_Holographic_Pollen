@@ -1,5 +1,5 @@
 # Use the official PyTorch image as base
-FROM pytorch/pytorch:2.5.0-cuda11.8-cudnn9-runtime
+FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-devel
 
 # Install git
 RUN apt-get update && \
@@ -11,7 +11,7 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Copy the entire repository into the container
-COPY . .
+COPY ./requirements.txt .
 
 # Install dependencies
 RUN pip install --upgrade pip && \

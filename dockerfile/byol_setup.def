@@ -3,7 +3,7 @@ Bootstrap: docker
 From: simonluder1/byol-training
 
 %files
-    repo/requirements.txt /app/requirements.txt
+    ./requirements.txt /app/requirements.txt
 
 %post
 # Install git
