@@ -1,3 +1,4 @@
+import os
 import yaml
 
 
@@ -20,3 +21,16 @@ def save(config, config_file):
             yaml.safe_dump(config, stream)
         except yaml.YAMLError as exc:
             print(exc)
+
+
+def get_ckpt_config_file(ckpt_path):
+    """Get config path from checkpoint folder"""
+    if os.path.isfile(ckpt_path):
+        ckpt_path = os.path.dirname(ckpt_path)
+        
+    for file in os.listdir(ckpt_path):
+        if file.endswith("config.yaml"):
+            config_path = os.path.join(ckpt_path, file)
+            print(f"[INFO] Using config file: {config_path}")
+            break
+    return config_path
