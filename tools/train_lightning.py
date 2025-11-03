@@ -160,7 +160,7 @@ def main(config_path):
     # Backbone
     backbone = get_backbone(model_conf["backbone"], pretrained=model_conf["pretrained"])
     backbone = set_single_channel_input(backbone)
-    backbone = update_linear_layer(backbone, layer=model_conf["hidden_layer"], out_features=model_conf["embedding_dim"])
+    backbone = update_linear_layer(backbone, layer=model_conf["hidden_layer"], out_features=model_conf["embedding_size"])
 
     # Lightning model
     model = BYOLLightningModule(

@@ -110,7 +110,7 @@ def inference(ckpt_path, config_path, config_updates=None):
     backbone = update_linear_layer(
         backbone, 
         layer=model_conf["hidden_layer"], 
-        out_features=model_conf["embedding_dim"]
+        out_features=model_conf["embedding_size"]
     )
 
     # Recreate BYOL model

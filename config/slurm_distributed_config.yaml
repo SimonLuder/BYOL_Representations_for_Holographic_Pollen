@@ -17,8 +17,8 @@ training :
   num_epochs : 50
   validation_step : 50
   num_nodes : 1
-  num_devices : 2
-  accumulate_grad_batches : 32
+  num_devices : 1
+  accumulate_grad_batches : 64
 
 byol:
   backbone : "resnet50"                                 # backbone architecture
