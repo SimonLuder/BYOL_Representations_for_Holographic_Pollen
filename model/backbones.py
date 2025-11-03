@@ -79,3 +79,31 @@ def set_single_channel_input(model: nn.Module, layer_name: Optional[str] = None)
                 break
 
     return model
+
+
+def find_layer(model: nn.Module, layer) -> Optional[nn.Module]:
+    if isinstance(layer, str):
+        modules = dict(model.named_modules())
+        return modules.get(layer, None)
+    elif isinstance(layer, int):
+        children = list(model.children())
+        return children[layer]
+    return None
+
+
+def update_linear_layer(model, layer, in_features=None, out_features=None):
+    target_layer = find_layer(model, layer)
+
+    if target_layer is None:
+        raise ValueError(f"Layer {layer} not found in model.")
+    
+    if in_features is None:
+        in_features = target_layer.in_features
+
+    if out_features is None:
+        out_features = target_layer.out_features
+        
+    new_layer = nn.Linear(in_features, out_features)
+    setattr(model, layer, new_layer)
+    return model
+      

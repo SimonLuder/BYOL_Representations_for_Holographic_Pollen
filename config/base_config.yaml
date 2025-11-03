@@ -19,9 +19,10 @@ training :
   grad_accumulation_steps : 10
 
 byol:
-  backbone : "resnet18"                                 # backbone architecture
+  backbone : "resnet50"                                 # backbone architecture
   pretrained : False                                    # load backbone pretrained if True
-  hidden_layer : "avgpool"                              # layer from which to extract features in backbone
+  hidden_layer : "fc"                                   # layer from which to extract embedding features in backbone
+  embedding_size : 256                                  # size of the embedding output
   projection_size : 256                                 # size of the projection output
   projection_hidden_size : 4096                         # size of the hidden layer in the projection MLP
   moving_average_decay : 0.99                           # exponential moving average decay for target network

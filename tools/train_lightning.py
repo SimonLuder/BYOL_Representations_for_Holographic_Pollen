@@ -14,7 +14,7 @@ from pytorch_lightning.strategies import DDPStrategy
 
 from utils import config
 from utils.custom_byol import BYOLWithTwoImages
-from model.backbones import get_backbone, set_single_channel_input
+from model.backbones import get_backbone, set_single_channel_input, update_linear_layer
 
 
 class BYOLLightningModule(pl.LightningModule):
@@ -160,6 +160,7 @@ def main(config_path):
     # Backbone
     backbone = get_backbone(model_conf["backbone"], pretrained=model_conf["pretrained"])
     backbone = set_single_channel_input(backbone)
+    backbone = update_linear_layer(backbone, layer=model_conf["hidden_layer"], out_features=model_conf["embedding_dim"])
 
     # Lightning model
     model = BYOLLightningModule(

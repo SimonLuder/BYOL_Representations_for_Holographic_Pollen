@@ -9,8 +9,9 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from pollen_datasets.poleno import PairwiseHolographyImageFolder
 
-from model.backbones import get_backbone, set_single_channel_input
+from model.backbones import get_backbone, set_single_channel_input, update_linear_layer
 from utils import config
+from utils.config import get_ckpt_config_file
 
 
 def load_model_weights(model, ckpt_path):
@@ -44,9 +45,20 @@ def load_model_weights(model, ckpt_path):
     return model
 
 
-def inference(ckpt_path, config_path):
+def deep_update(d, u):
+    for k, v in u.items():
+        if isinstance(v, dict) and isinstance(d.get(k), dict):
+            deep_update(d[k], v)
+        else:
+            d[k] = v
+    return d
+
+
+def inference(ckpt_path, config_path, config_updates=None):
 
     conf = config.load(config_path)
+    if config_updates:
+        conf = deep_update(conf, config_updates)
     dataset_conf = conf["dataset"]
     model_conf = conf ["byol"]
 
@@ -95,6 +107,11 @@ def inference(ckpt_path, config_path):
     # Backbone
     backbone = get_backbone(model_conf["backbone"], pretrained=False)
     backbone = set_single_channel_input(backbone)
+    backbone = update_linear_layer(
+        backbone, 
+        layer=model_conf["hidden_layer"], 
+        out_features=model_conf["embedding_dim"]
+    )
 
     # Recreate BYOL model
     model = BYOLWithTwoImages(
@@ -110,7 +127,6 @@ def inference(ckpt_path, config_path):
     # ----------------------------
     model = load_model_weights(model, ckpt_path)
     model.eval()
-
 
     all_proj1, all_proj2 = [], []
     all_emb1, all_emb2 = [], []
@@ -158,13 +174,27 @@ def inference(ckpt_path, config_path):
 
 if __name__ == "__main__":
 
-    ckpt_path = r"C:\Users\simon\Documents\GitHub\BYOL_Representations_for_Holographic_Pollen\models\byol_lightning_20251024_020710\last.ckpt"
+    ckpt_file = "checkpoints/byol_lightning_20251030_164712/last.ckpt"
+    ckpt_file = "checkpoints/byol_lightning_20251030_164712/epoch_epoch=49-step=3088-val_loss=0.0524.ckpt"
+    config_file = None
 
     parser = argparse.ArgumentParser(description='Path of the configuration file.')
-    parser.add_argument('--config', default='config/base_config.yaml', type=str)
-    parser.add_argument('--ckpt', default=ckpt_path, type=str)
+    parser.add_argument('--ckpt', default=ckpt_file, type=str)
+    parser.add_argument('--config', default=config_file, type=str)
     args = parser.parse_args()
 
-    print(os.listdir("."))
+    if args.config is None:
+        args.config = get_ckpt_config_file(args.ckpt)
 
-    inference(args.ckpt, args.config)
+    print(f"Running inference with checkpoint: {args.ckpt} and config: {args.config}")
+
+    config_updates = {
+        "dataset": {
+            "root": "Z:/marvel/marvel-fhnw/data/Poleno/",
+            "labels_train": "data/processed/poleno/labels_train.csv",
+            "labels_val": "data/processed/poleno/labels_val.csv",
+            "labels_test": "data/processed/poleno/labels_test.csv",
+        }
+    }
+
+    inference(args.ckpt, args.config, config_updates=config_updates)
