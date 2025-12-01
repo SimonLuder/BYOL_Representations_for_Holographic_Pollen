@@ -1,15 +1,16 @@
 comment: ""
 
-dataset :
-  root : "Z:/marvel/marvel-fhnw/data/Poleno/"                   # root folder of the dataset
-  img_channels : 1                                              # grayscale images
-  img_size : 200                                                # original image size
-  img_interpolation : 224                                       # size after interpolation or "Null"
-  labels_train : data/processed/poleno/labels_train.csv         # training labels
-  labels_val : data/processed/poleno/labels_val.csv             # validation labels
-  labels_test : data/processed/poleno/labels_test.csv           # test labels
-  filenames : filenames                                         # column name containing filenames
-  img_path : filenames                                          # column name containing relative image path from root
+dataset : # Dataset configuration
+  root : "Z:/marvel/marvel-fhnw/data/"                            # root folder of the dataset
+  img_channels : 1                                                # grayscale images
+  img_size : 200                                                  # original image size
+  img_interpolation : 224                                         # size after interpolation or "Null"
+  labels_train : data/final/poleno/basic_train.csv                # training labels
+  labels_val : data/final/poleno/basic_val_20.csv                 # validation labels
+  labels_test : data/final/poleno/basic_test.csv                  # test labels
+  filenames : rec_path                                            # column name containing filenames
+  img_path : img_path                                             # column name containing absolute or relative image path from root
+  particle_id : event_id                                          # how to identify the same particle object
 
 training :
   lr : 0.00005
