@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "byol_poleno"
+version = "0.0.1"
+description = "Code to train and use a encoder for poleno images with byol."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name="SimonLuder", email="simon.luder@students.fhwn.ch" }]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "Pillow",
+    "torch",
+    "pytorch-lightning",
+    "byol_pytorch",
+]
+
+[project.urls]
+Homepage = "https://github.com/SimonLuder/BYOL_Representations_for_Holographic_Pollen"
