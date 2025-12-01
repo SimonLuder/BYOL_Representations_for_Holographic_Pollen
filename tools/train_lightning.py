@@ -12,9 +12,9 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.strategies import DDPStrategy
 
-from utils import config
-from utils.custom_byol import BYOLWithTwoImages
-from model.backbones import get_backbone, set_single_channel_input, update_linear_layer
+from byol_poleno.utils import config
+from byol_poleno.utils.custom_byol import BYOLWithTwoImages
+from byol_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
 
 
 class BYOLLightningModule(pl.LightningModule):
@@ -116,12 +116,12 @@ def main(config_path):
         raise FileNotFoundError(f'File {dataset_conf["labels_train"]} does not exist')
     if not os.path.isfile(dataset_conf["labels_val"]):
         raise FileNotFoundError(f'File {dataset_conf["labels_val"]} does not  exist')
-
+    
     # Datasets
     dataset_train = PairwiseHolographyImageFolder(
         root=dataset_conf["root"],
         transform=transform,
-        config=dataset_conf,
+        dataset_cfg=dataset_conf,
         labels=dataset_conf.get("labels_train"),
         verbose=True,
     )
@@ -130,7 +130,7 @@ def main(config_path):
         dataset_val = PairwiseHolographyImageFolder(
             root=dataset_conf["root"],
             transform=transform,
-            config=dataset_conf,
+            dataset_cfg=dataset_conf,
             labels=dataset_conf.get("labels_val"),
             verbose=True,
         )

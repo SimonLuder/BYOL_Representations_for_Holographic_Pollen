@@ -9,9 +9,9 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from pollen_datasets.poleno import PairwiseHolographyImageFolder
 
-from model.backbones import get_backbone, set_single_channel_input, update_linear_layer
-from utils import config
-from utils.config import get_ckpt_config_file
+from byol_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
+from byol_poleno.utils import config
+from byol_poleno.utils.config import get_ckpt_config_file
 
 
 def load_model_weights(model, ckpt_path):
@@ -87,7 +87,7 @@ def inference(ckpt_path, config_path, config_updates=None):
     dataset_test = PairwiseHolographyImageFolder(
         root=dataset_conf["root"],
         transform=transform,
-        config=dataset_conf,
+        dataset_cfg=dataset_conf,
         labels=dataset_conf.get("labels_test"),
         verbose=True,
     )
@@ -116,10 +116,15 @@ def inference(ckpt_path, config_path, config_updates=None):
     # Recreate BYOL model
     model = BYOLWithTwoImages(
         backbone,
-        image_size=224,    # <- same as dataset_conf["img_interpolation"] or img_size
-        image_channels=dataset_conf["img_channels"], 
+        image_size=dataset_conf.get("img_interpolation", dataset_conf["img_size"]),
+        image_channels=dataset_conf.get("img_channels", 1),
+        hidden_layer=model_conf.get("hidden_layer", "avgpool"),
+        projection_size=model_conf.get("projection_size", 256),
+        projection_hidden_size=model_conf.get("projection_hidden_size", 4096),
         augment_fn=torch.nn.Identity(),
-        hidden_layer="avgpool"
+        augment_fn2=None,
+        moving_average_decay=model_conf.get("moving_average_decay", 0.99),
+        use_momentum=model_conf.get("use_momentum", True),
     )
 
     # ----------------------------
@@ -174,8 +179,8 @@ def inference(ckpt_path, config_path, config_updates=None):
 
 if __name__ == "__main__":
 
-    ckpt_file = "checkpoints/byol_lightning_20251030_164712/last.ckpt"
-    ckpt_file = "checkpoints/byol_lightning_20251030_164712/epoch_epoch=49-step=3088-val_loss=0.0524.ckpt"
+    ckpt_file = "checkpoints/byol_lightning_20251104_104808/last.ckpt"
+    # ckpt_file = "checkpoints/byol_lightning_20251030_164712/epoch_epoch=49-step=3088-val_loss=0.0524.ckpt"
     config_file = None
 
     parser = argparse.ArgumentParser(description='Path of the configuration file.')

@@ -1,4 +1,5 @@
 import os
+import shutil
 import numpy as np
 from datetime import datetime
 from tqdm import tqdm
@@ -8,17 +9,26 @@ from pollen_datasets.poleno import PairwiseHolographyImageFolder
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from torchvision import models
 
-from utils import config
-from utils.wandb_utils import WandbManager
-from utils.custom_byol import BYOLWithTwoImages
-from utils.model_setup import set_single_channel_input
+from byol_poleno.utils import config
+from byol_poleno.utils.wandb_utils import WandbManager
+from byol_poleno.utils.custom_byol import BYOLWithTwoImages
+from byol_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
+
+
+def set_bn_eval(m):
+    if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
+        m.eval()
+
+
+def set_bn_train(m):
+    if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
+        m.train()
 
 
 class Trainer:
 
-    def __init__(self, model, optimizer, dataloader_train, dataloader_val=None, device="cpu", wandb_run=None, checkpoint_dir=None, val_step=None):
+    def __init__(self, model, optimizer, dataloader_train, dataloader_val=None, device="cpu", wandb_run=None, checkpoint_dir=None, val_step=None, accum_steps=1):
         self.model = model
         self.optimizer = optimizer
         self.device = device
@@ -29,26 +39,43 @@ class Trainer:
         self.val_step = val_step
         self.dataloader_train = dataloader_train
         self.dataloader_val = dataloader_val
+        self.accum_steps = accum_steps
 
 
     def train_one_epoch(self):
 
         self.model.train()
-        n_samples = []
-        all_losses = []
+        self.model.apply(set_bn_eval)  # override: freeze BN
+        self.optimizer.zero_grad()
+        n_samples_train = []
+        all_losses_train = []
         
         pbar = tqdm(self.dataloader_train, desc="Training")
         for ((im1, im2), _, _) in pbar:
+
+            self._step += 1
+            
             im1, im2 = im1.to(self.device), im2.to(self.device)
 
             loss = self.model(x1=im1, x2=im2)
-            self.optimizer.zero_grad()
+            loss = loss / self.accum_steps
             loss.backward()
-            self.optimizer.step()
-            self.model.update_moving_average()  # Update moving average of target encoder
 
-            n_samples.append(im1.shape[0])
-            all_losses.append(loss.item())
+            # accumulate gradients
+            if (self._step) % self.accum_steps == 0:
+
+                # Enable BN updates for this "true step"
+                self.model.apply(set_bn_train)
+
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+                self.model.update_moving_average()  # Update moving average of target encoder
+
+                # 2. Freeze BN again for accumulation steps
+                self.model.apply(set_bn_eval)
+
+            n_samples_train.append(im1.shape[0])
+            all_losses_train.append(loss.item())
 
             # Log batch metrics
             if self.wandb_run is not None:
@@ -56,13 +83,13 @@ class Trainer:
                     data = {"train_loss":loss.item()},
                     step = self._step
                     )
-                self._step += 1
 
             if (self.val_step is not None) and (self._step % self.val_step == 0):
                 self.validate_one_epoch()
                 self.model.train()
+                self.model.apply(set_bn_eval)
 
-        epoch_loss = self._compute_epoch_loss(n_samples, all_losses)
+        epoch_loss = self._compute_epoch_loss(n_samples_train, all_losses_train)
 
         # Log epoch metrics
         if self.wandb_run is not None:
@@ -74,8 +101,8 @@ class Trainer:
     
     def validate_one_epoch(self):
 
-        n_samples = []
-        all_losses = []
+        n_samples_val = []
+        all_losses_val = []
         self.model.eval()
 
         with torch.no_grad():
@@ -85,10 +112,11 @@ class Trainer:
 
                 loss = self.model(x1=im1, x2=im2)
 
-                n_samples.append(im1.shape[0])
-                all_losses.append(loss.item())
+                n_samples_val.append(im1.shape[0])
+                all_losses_val.append(loss.item())
 
-        epoch_loss = self._compute_epoch_loss(n_samples, all_losses)
+            epoch_loss = self._compute_epoch_loss(n_samples_val, all_losses_val)
+            print("epoch loss", epoch_loss)
 
         # Log epoch metrics
         if self.wandb_run is not None:
@@ -128,9 +156,10 @@ def main(config_path):
     conf = config.load(config_path)
     dataset_conf = conf['dataset']
     train_conf = conf['training']
+    model_conf = conf['byol']
 
     # Logging with WandB
-    run_name = f"byol_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    run_name = f"byol_single_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     wandb_manager = WandbManager(
         project="ByolHolographicPollen", 
         run_name=run_name, 
@@ -162,7 +191,7 @@ def main(config_path):
     dataset_train = PairwiseHolographyImageFolder(
         root=dataset_conf["root"], 
         transform=transform, 
-        config=dataset_conf,
+        dataset_cfg=dataset_conf,
         labels=dataset_conf.get("labels_train"),
         verbose=True
     )
@@ -170,7 +199,7 @@ def main(config_path):
         dataset_val = PairwiseHolographyImageFolder(
             root=dataset_conf["root"], 
             transform=transform, 
-            config=dataset_conf,
+            dataset_cfg=dataset_conf,
             labels=dataset_conf.get("labels_val"),
             verbose=True)
     
@@ -185,26 +214,39 @@ def main(config_path):
                                     shuffle=False)
 
     # Backbone
-    backbone = models.resnet50(pretrained=True)
+    backbone = get_backbone(model_conf["backbone"], pretrained=False)
     backbone = set_single_channel_input(backbone)
+    backbone = update_linear_layer(backbone, layer=model_conf["hidden_layer"], out_features=model_conf["embedding_size"])
 
     # BYOL
     model = BYOLWithTwoImages(
         backbone,
         image_size = dataset_conf.get("img_interpolation", dataset_conf["img_size"]),
         image_channels = dataset_conf.get("img_channels", 1),
-        augment_fn=torch.nn.Identity(), # No augmentation with 2 different images and grayscale
-        hidden_layer = 'avgpool')
+        hidden_layer=model_conf.get("hidden_layer", "avgpool"),
+        projection_size=model_conf.get("projection_size", 256),
+        projection_hidden_size=model_conf.get("projection_hidden_size", 4096),
+        augment_fn=torch.nn.Identity(),
+        augment_fn2=None,
+        moving_average_decay=model_conf.get("moving_average_decay", 0.99),
+        use_momentum=model_conf.get("use_momentum", True),
+        )
     model.to(device)
 
     # Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=train_conf["lr"])
 
     # Model trainer
-    checkpoint_dir = os.path.join("models", run_name)
+    checkpoint_dir = os.path.join("checkpoints", run_name)
     val_step=train_conf["validation_step"]
+    acc_steps = train_conf.get("grad_accumulation_steps", 1)
     trainer = Trainer(model, optimizer, dataloader_train, dataloader_val, 
-                      device, wandb_run, checkpoint_dir, val_step)
+                      device, wandb_run, checkpoint_dir, val_step, acc_steps)
+    
+    # Save config file to checkpoint directory
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    destination = os.path.join(checkpoint_dir, os.path.basename(config_path))
+    shutil.copy2(config_path, destination)
 
     for epoch_idx in range(train_conf["num_epochs"]):
         
