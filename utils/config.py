@@ -33,4 +33,6 @@ def get_ckpt_config_file(ckpt_path):
             config_path = os.path.join(ckpt_path, file)
             print(f"[INFO] Using config file: {config_path}")
             break
+        else:
+            print(f"[WARNING] No config file found in {ckpt_path}.")
     return config_path

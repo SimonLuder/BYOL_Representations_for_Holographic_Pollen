@@ -1,4 +1,8 @@
+import numpy as np
 import plotly.express as px
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 def interactive_pca_3d_highlight(df, highlight_column="species", width=800, height=600):
     """Interactive 3D PCA plot with dropdown to highlight different species.
@@ -68,3 +72,30 @@ def interactive_pca_3d_highlight(df, highlight_column="species", width=800, heig
     )
 
     fig3d.show()
+
+
+def show_confusion_matrix(y_true, y_pred, classes, figsize=(10,8), normalize=False, fontsize=8):
+
+    cm = confusion_matrix(y_true, y_pred, labels=classes)
+
+    if normalize:
+        cm = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
+        fmt = ".1f"
+    else:
+        fmt = "d"
+  
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.heatmap(cm, annot=True, cmap="Purples",
+                xticklabels=classes, yticklabels=classes,
+                annot_kws={"size": fontsize})
+    
+    ax.set_xlabel("Predicted", fontsize=fontsize+2)
+    ax.set_ylabel("True", fontsize=fontsize+2)
+    ax.set_title("Confusion Matrix", fontsize=fontsize+4)
+    
+    # Ticks
+    plt.xticks(fontsize=fontsize, rotation=90, ha="right")
+    plt.yticks(fontsize=fontsize)
+    
+    plt.tight_layout()
+    plt.show()

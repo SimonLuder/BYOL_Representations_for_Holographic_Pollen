@@ -135,16 +135,16 @@ class BYOLWithTwoImages(nn.Module):
             # No augmentation here
             images = torch.cat((x1, x2), dim=0)
 
-        online_projections, _ = self.online_encoder(images) # Backbone
-        online_predictions = self.online_predictor(online_projections) # Head
+        online_projections, _ = self.online_encoder(images) # Backbone + Projector
+        online_predictions = self.online_predictor(online_projections) # Predictor head
 
         online_pred_one, online_pred_two = online_predictions.chunk(2, dim=0) # Split samples
 
         with torch.no_grad(): # Target encoder is either the momentum updated net or just the online encoder
             target_encoder = self._get_target_encoder() if self.use_momentum else self.online_encoder
 
-            target_projections, _ = target_encoder(images) # Backbone
-            target_projections = target_projections.detach() # Head
+            target_projections, _ = target_encoder(images) # Backbone + Projector
+            target_projections = target_projections.detach()
 
             target_proj_one, target_proj_two = target_projections.chunk(2, dim=0) # Split
 

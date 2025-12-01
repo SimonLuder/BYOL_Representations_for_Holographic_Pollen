@@ -245,6 +245,6 @@ def main(config_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Path of the configuration file.")
-    parser.add_argument("--config", default="config/slurm_distributed_config.yaml", type=str)
+    parser.add_argument("--config", default="config/base_distributed_config.yaml", type=str)
     args = parser.parse_args()
     main(args.config)
