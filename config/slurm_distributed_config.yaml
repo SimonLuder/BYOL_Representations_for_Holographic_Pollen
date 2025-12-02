@@ -15,7 +15,7 @@ dataset: # Dataset configuration
 training :
   lr : 0.00005
   batch_size : 64
-  num_epochs : 50
+  num_epochs : 25
   validation_step : 50
   num_nodes : 1
   num_devices : 1
@@ -23,7 +23,7 @@ training :
 
 byol:
   backbone : "resnet50"                                 # backbone architecture
-  pretrained : False                                    # load backbone pretrained if True
+  pretrained : True                                     # load backbone pretrained if True
   hidden_layer : "fc"                                   # layer from which to extract embedding features in backbone
   embedding_size : 256                                  # size of the embedding output
   projection_size : 256                                 # size of the projection output
