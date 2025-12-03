@@ -12,7 +12,7 @@ from torchvision import transforms
 
 from byol_poleno.utils import config
 from byol_poleno.utils.wandb_utils import WandbManager
-from byol_poleno.utils.custom_byol import BYOLWithTwoImages
+from byol_poleno.model import BYOLWithTwoImages
 from byol_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
 
 

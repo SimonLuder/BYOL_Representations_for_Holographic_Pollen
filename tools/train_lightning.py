@@ -13,7 +13,7 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.strategies import DDPStrategy
 
 from byol_poleno.utils import config
-from byol_poleno.utils.custom_byol import BYOLWithTwoImages
+from byol_poleno.model import BYOLWithTwoImages
 from byol_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
 
 
