@@ -107,3 +107,30 @@ def update_linear_layer(model, layer, in_features=None, out_features=None):
     setattr(model, layer, new_layer)
     return model
       
+
+def load_byol_backbone_weights_from_checkpoint(ckpt_path, backbone):
+    """
+    Load the weights for the byol backbone from a lightning ckpt
+
+    Args:
+        ckpt_path (str): path to the checkpoint file
+        backbone (nn.Module): torch backbone model
+
+    Returns:
+        backbone with weights loaded from the state dict
+    """
+    ckpt = torch.load(ckpt_path, map_location="cpu")
+    sd = ckpt["state_dict"]
+
+    # strip "model." prefix (Lightning)
+    sd = {k.replace("model.", "", 1): v for k, v in sd.items()}
+
+    # extract only backbone weights
+    backbone_sd = {
+        k.replace("online_encoder.net.", "", 1): v
+        for k, v in sd.items()
+        if k.startswith("online_encoder.net.")
+    }
+
+    backbone.load_state_dict(backbone_sd, strict=False)
+    return backbone
