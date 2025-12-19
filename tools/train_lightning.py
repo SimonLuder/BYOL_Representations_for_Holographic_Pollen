@@ -19,7 +19,9 @@ from byol_poleno.model.backbones import get_backbone, set_single_channel_input, 
 
 class BYOLLightningModule(pl.LightningModule):
     def __init__(self, backbone, image_size, image_channels, hidden_layer="avgpool", projection_size=256, projection_hidden_size=4096, 
-                 augment_fn=torch.nn.Identity(), augment_fn2=None, moving_average_decay=0.99, use_momentum=True, lr=3e-4):
+                 augment_fn=torch.nn.Identity(), augment_fn2=None, moving_average_decay=0.99, use_momentum=True, lr=3e-4, 
+                 use_vitreg = False, lambda_var_emb  = 10.0, lambda_cov_emb  = 0.5
+                 ):
         super().__init__()
         self.model = BYOLWithTwoImages(
             backbone,
@@ -29,10 +31,13 @@ class BYOLLightningModule(pl.LightningModule):
             projection_size=projection_size,
             projection_hidden_size=projection_hidden_size,
             augment_fn=augment_fn,
-            augment_fn2 = augment_fn2, 
+            augment_fn2=augment_fn2, 
             moving_average_decay=moving_average_decay,
             use_momentum=use_momentum,
             sync_batchnorm=True if torch.cuda.device_count() > 1 else False,
+            use_vitreg=use_vitreg,
+            lambda_var_emb=lambda_var_emb,
+            lambda_cov_emb=lambda_cov_emb
         )
         self.lr = lr
         self.best_val_loss = float("inf")
@@ -176,6 +181,9 @@ def main(config_path):
         moving_average_decay=model_conf.get("moving_average_decay", 0.99),
         use_momentum=model_conf.get("use_momentum", True),
         lr=train_conf["lr"],
+        use_vitreg=model_conf.get("use_vitreg", False),
+        lambda_var_emb=model_conf.get("lambda_var_emb", 25),
+        lambda_cov_emb=model_conf.get("lamda_cov_emb", 1),
     )
 
     # Callbacks

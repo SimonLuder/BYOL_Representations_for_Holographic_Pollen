@@ -24,6 +24,27 @@ def loss_fn(x, y):
     return 2 - 2 * (x * y).sum(dim=-1)
 
 
+def variance_loss(z, eps=1e-4):
+    """
+    z: (batch_size, dim)
+    """
+    std = torch.sqrt(z.var(dim=0) + eps)
+    return torch.mean(F.relu(1.0 - std))
+
+
+def covariance_loss(z):
+    """
+    z: (batch_size, dim)
+    """
+    z = z - z.mean(dim=0)
+    batch_size, dim = z.shape
+
+    cov = (z.T @ z) / (batch_size - 1)
+    off_diag = cov.flatten()[1:].view(dim - 1, dim + 1)[:, :-1]
+
+    return (off_diag ** 2).sum() / dim
+
+
 class BYOLWithTwoImages(nn.Module):
     """
     https://github.com/lucidrains/byol-pytorch/blob/master/byol_pytorch/byol_pytorch.py
@@ -41,7 +62,10 @@ class BYOLWithTwoImages(nn.Module):
         augment_fn2 = None,
         moving_average_decay = 0.99,
         use_momentum = True,
-        sync_batchnorm = None
+        sync_batchnorm = None,
+        use_vitreg = False, 
+        lambda_var_emb = 10.0,
+        lambda_cov_emb = 0.5,
     ):
         super().__init__()
         self.net = net
@@ -90,6 +114,12 @@ class BYOLWithTwoImages(nn.Module):
         # send a mock image tensor to instantiate singleton parameters
         self.forward(torch.randn(2, image_channels, image_size, image_size, device=device))
 
+        # VITReg
+        self.use_vitreg = use_vitreg
+        self.lambda_var_emb = lambda_var_emb
+        self.lambda_cov_emb = lambda_cov_emb
+
+
     @singleton('target_encoder')
     def _get_target_encoder(self):
         target_encoder = copy.deepcopy(self.online_encoder)
@@ -117,7 +147,6 @@ class BYOLWithTwoImages(nn.Module):
             'you must have greater than 1 sample when training, due to the batchnorm in the projection layer'
                
         if x2 is None: # Single samples
-
             if return_embedding:
                 return self.online_encoder(x1, return_projection = return_projection)
 
@@ -126,7 +155,6 @@ class BYOLWithTwoImages(nn.Module):
             images = torch.cat((image_one, image_two), dim = 0)
 
         else: # Sample pairs
-
             if return_embedding:
                 embedding1 = self.online_encoder(x1, return_projection=return_projection)
                 embedding2 = self.online_encoder(x2, return_projection=return_projection)
@@ -135,14 +163,14 @@ class BYOLWithTwoImages(nn.Module):
             # No augmentation here
             images = torch.cat((x1, x2), dim=0)
 
-        online_projections, _ = self.online_encoder(images) # Backbone + Projector
+        online_projections, online_embeddings = self.online_encoder(images) # Backbone + Projector
         online_predictions = self.online_predictor(online_projections) # Predictor head
 
         online_pred_one, online_pred_two = online_predictions.chunk(2, dim=0) # Split samples
 
-        with torch.no_grad(): # Target encoder is either the momentum updated net or just the online encoder
+        # Target encoder is either the momentum updated net or just the online encoder
+        with torch.no_grad(): 
             target_encoder = self._get_target_encoder() if self.use_momentum else self.online_encoder
-
             target_projections, _ = target_encoder(images) # Backbone + Projector
             target_projections = target_projections.detach()
 
@@ -151,7 +179,18 @@ class BYOLWithTwoImages(nn.Module):
         loss_one = loss_fn(online_pred_one, target_proj_two.detach()) # Loss online1 to target2
         loss_two = loss_fn(online_pred_two, target_proj_one.detach()) # Loss online2 to target1
 
-        loss = loss_one + loss_two
-        return loss.mean()
-    
-    
+        loss = (loss_one + loss_two).mean()
+
+        # VICReg on embeddings
+        if self.use_vitreg:
+            emb_one, emb_two = online_embeddings.chunk(2, dim=0)
+            var_emb = variance_loss(emb_one) + variance_loss(emb_two)
+            cov_emb = covariance_loss(emb_one) + covariance_loss(emb_two)
+
+            loss = (
+                loss
+                + var_emb * self.lambda_var_emb
+                + cov_emb * self.lambda_cov_emb
+                )
+        
+        return loss

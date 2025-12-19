@@ -30,3 +30,6 @@ byol:
   projection_hidden_size : 4096                         # size of the hidden layer in the projection MLP
   moving_average_decay : 0.99                           # exponential moving average decay for target network
   use_momentum : True                                   # whether to use momentum encoder
+  use_vitreg: True
+  lambda_var_emb : 10
+  lamda_cov_emb : 0.5
