@@ -104,8 +104,8 @@ def main(config_path):
 
     transforms_list.append(
         transforms.Normalize(
-            (0.5,) * dataset_conf["img_channels"],
-            (0.5,) * dataset_conf["img_channels"],
+            [0.5,] * dataset_conf["img_channels"],
+            [0.5,] * dataset_conf["img_channels"],
         )
     )
 
@@ -160,7 +160,8 @@ def main(config_path):
     # Backbone
     backbone = get_backbone(model_conf["backbone"], pretrained=model_conf["pretrained"])
     backbone = set_single_channel_input(backbone)
-    backbone = update_linear_layer(backbone, layer=model_conf["hidden_layer"], out_features=model_conf["embedding_size"])
+    if model_conf["embedding_size"] is not None:
+        backbone = update_linear_layer(backbone, layer=model_conf["hidden_layer"], out_features=model_conf["embedding_size"])
 
     # Lightning model
     model = BYOLLightningModule(
