@@ -66,7 +66,7 @@ class BYOLWithTwoImages(nn.Module):
         use_vitreg = False, 
         lambda_var_emb = 10.0,
         lambda_cov_emb = 0.5,
-    ):
+        ):
         super().__init__()
         self.net = net
 
@@ -111,15 +111,15 @@ class BYOLWithTwoImages(nn.Module):
         device = get_module_device(net)
         self.to(device)
 
-        # send a mock image tensor to instantiate singleton parameters
-        self.forward(torch.randn(2, image_channels, image_size, image_size, device=device))
-
         # VITReg
         self.use_vitreg = use_vitreg
         self.lambda_var_emb = lambda_var_emb
         self.lambda_cov_emb = lambda_cov_emb
 
+        # send a mock image tensor to instantiate singleton parameters
+        self.forward(torch.randn(2, image_channels, image_size, image_size, device=device))
 
+        
     @singleton('target_encoder')
     def _get_target_encoder(self):
         target_encoder = copy.deepcopy(self.online_encoder)
@@ -141,7 +141,7 @@ class BYOLWithTwoImages(nn.Module):
         x2=None,
         return_embedding=False,
         return_projection=True
-    ):
+        ):
         
         assert not (self.training and x1.shape[0] == 1), \
             'you must have greater than 1 sample when training, due to the batchnorm in the projection layer'
