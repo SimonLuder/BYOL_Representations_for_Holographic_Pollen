@@ -7,7 +7,7 @@ dataset : # Dataset configuration
   img_interpolation : 224                                         # size after interpolation or "Null"
   labels_train : data/final/poleno/basic_train.csv                # training labels
   labels_val : data/final/poleno/basic_val_20.csv                 # validation labels
-  labels_test : data/final/poleno/basic_test.csv                  # test labels
+  labels_test : data/final/poleno/basic_test_20.csv                  # test labels
   filenames : rec_path                                            # column name containing filenames
   img_path : img_path                                             # column name containing absolute or relative image path from root
   particle_id : event_id                                          # how to identify the same particle object
@@ -30,6 +30,15 @@ byol:
   projection_hidden_size : 4096                         # size of the hidden layer in the projection MLP
   moving_average_decay : 0.99                           # exponential moving average decay for target network
   use_momentum : True                                   # whether to use momentum encoder
-  use_vitreg: True
-  lambda_var_emb : 10
-  lamda_cov_emb : 0.5
+  use_vitreg: False
+  lambda_var_emb : 0.0003
+  lamda_cov_emb : 0.00001
+  val_knn : True
+  
+conditioning: # For knn validation only
+  enabled: "class"
+  encoders: 
+    class: 
+      type: categorical
+      encoder: Embedding
+      use_columns: species_norm_enum

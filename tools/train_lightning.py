@@ -5,6 +5,7 @@ import argparse
 from pollen_datasets.poleno import PairwiseHolographyImageFolder
 
 import torch
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision import models
@@ -20,7 +21,7 @@ from byol_poleno.model.backbones import get_backbone, set_single_channel_input, 
 class BYOLLightningModule(pl.LightningModule):
     def __init__(self, backbone, image_size, image_channels, hidden_layer="avgpool", projection_size=256, projection_hidden_size=4096, 
                  augment_fn=torch.nn.Identity(), augment_fn2=None, moving_average_decay=0.99, use_momentum=True, lr=3e-4, 
-                 use_vitreg = False, lambda_var_emb  = 10.0, lambda_cov_emb  = 0.5
+                 use_vitreg=False, lambda_var_emb=10.0, lambda_cov_emb=0.5, val_knn=False,
                  ):
         super().__init__()
         self.model = BYOLWithTwoImages(
@@ -37,10 +38,14 @@ class BYOLLightningModule(pl.LightningModule):
             sync_batchnorm=True if torch.cuda.device_count() > 1 else False,
             use_vitreg=use_vitreg,
             lambda_var_emb=lambda_var_emb,
-            lambda_cov_emb=lambda_cov_emb
+            lambda_cov_emb=lambda_cov_emb,
         )
         self.lr = lr
         self.best_val_loss = float("inf")
+        self.val_embeddings = []
+        self.val_knn = val_knn
+        self.val_knn_labels = []    
+
 
     def training_step(self, batch, batch_idx):
         (im1, im2), _, _ = batch
@@ -50,25 +55,128 @@ class BYOLLightningModule(pl.LightningModule):
 
         # Log loss and training samples seen
         self.log("train_loss", loss, on_step=True, on_epoch=True, sync_dist=True, batch_size=local_bs)
+
+        # Log embedding batch std every 100 steps
+        if self.global_step % 100 == 0:
+            emb1, emb2 = self.get_embbedings(im1, im2)
+            emb_std = self.calc_embedding_std(emb1, emb2)
+            self.log(
+                "train_emb_std",
+                emb_std,
+                on_step=True,
+                on_epoch=False,
+                sync_dist=True,
+                batch_size=local_bs,
+            )
+
         return loss
 
+
     def validation_step(self, batch, batch_idx):
-        (im1, im2), _, _ = batch
+        (im1, im2), (label1, label2), _ = batch
         loss = self.model(x1=im1, x2=im2)
+
+        # Store embeddings for epoch-end stats
+        emb1, emb2 = self.get_embbedings(im1, im2)
+        emb = torch.cat([emb1, emb2], dim=0)
+        self.val_embeddings.append(emb.detach().cpu())
+
+
+        if self.val_knn == True and label1.get("class") is not None:
+            labels = torch.cat([label1.get("class"), label2.get("class")], dim=0)
+            self.val_knn_labels.append(labels.detach().cpu())
 
         local_bs = im1.size(0)
 
         # Log validation loss
         self.log("val_loss", loss, on_step=False, on_epoch=True, sync_dist=True, batch_size=local_bs)
+
         return loss
+
+
+    def on_validation_epoch_end(self):
+
+        if not self.val_embeddings:
+            return
+
+        # Local embeddings: (N, D)
+        emb = torch.cat(self.val_embeddings, dim=0).to(self.device)
+
+        if self.val_knn and self.val_knn_labels:
+            # Local labels: (N,)
+            lbl = torch.cat(self.val_knn_labels, dim=0).to(self.device)
+
+            # Gather across GPUs
+            emb = self.all_gather(emb)
+            lbl = self.all_gather(lbl)
+
+            # DDP case: (world_size, N, D) -> (world_size * N, D)
+            if emb.dim() == 3:
+                emb = emb.flatten(0, 1)
+
+            # DDP case: (world_size, N) -> (world_size * N,)
+            if lbl.dim() > 1:
+                lbl = lbl.flatten()
+
+            # Sanity checks (safe to remove later)
+            assert emb.dim() == 2, emb.shape
+            assert lbl.dim() == 1, lbl.shape
+            assert emb.shape[0] == lbl.shape[0]
+
+            if self.trainer.is_global_zero:
+                knn_acc = self.knn_accuracy(emb, lbl, k=10)
+                self.log("val_knn_acc_epoch", knn_acc)
+
+        # Embedding stats (local stats are fine here)
+        embeddings = torch.cat(self.val_embeddings, dim=0)
+        emb_std = embeddings.std(dim=0).mean()
+        self.log("val_emb_std_epoch", emb_std, sync_dist=True)
+
+        # Clear buffers
+        self.val_embeddings.clear()
+        self.val_knn_labels.clear()
+
+
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
     
+
     def on_before_zero_grad(self, _):
         if self.model.use_momentum:
             self.model.update_moving_average()
 
+
+    def get_embbedings(self, x1, x2):
+        with torch.no_grad():
+            emb1, emb2 = self.model(
+                x1=x1,
+                x2=x2,
+                return_embedding=True,
+                return_projection=False,
+            )
+        return emb1, emb2
+
+
+    def calc_embedding_std(self, emb1, emb2):
+        emb = torch.cat([emb1, emb2], dim=0)
+        emb_std = emb.std(dim=0).mean()
+        return emb_std
+    
+
+    @staticmethod
+    @torch.no_grad()
+    def knn_accuracy(emb, labels, k=10):
+        emb = F.normalize(emb, dim=1)
+        sim = emb @ emb.T
+        sim.fill_diagonal_(-float("inf"))
+
+        topk = sim.topk(k=k, dim=1).indices
+        preds, _ = torch.mode(labels[topk], dim=1)
+
+        return (preds == labels).float().mean()
+    
+    
 
 def main(config_path):
 
@@ -77,6 +185,7 @@ def main(config_path):
     dataset_conf = conf["dataset"]
     train_conf = conf["training"]
     model_conf = conf["byol"]
+    cond_conf = conf.get("conditioning", {})
 
     pl.seed_everything(42, workers=True)
    
@@ -136,6 +245,7 @@ def main(config_path):
             root=dataset_conf["root"],
             transform=transform,
             dataset_cfg=dataset_conf,
+            cond_cfg=cond_conf,
             labels=dataset_conf.get("labels_val"),
             verbose=True,
         )
@@ -184,6 +294,7 @@ def main(config_path):
         use_vitreg=model_conf.get("use_vitreg", False),
         lambda_var_emb=model_conf.get("lambda_var_emb", 25),
         lambda_cov_emb=model_conf.get("lamda_cov_emb", 1),
+        val_knn=model_conf.get("val_knn", False),
     )
 
     # Callbacks
