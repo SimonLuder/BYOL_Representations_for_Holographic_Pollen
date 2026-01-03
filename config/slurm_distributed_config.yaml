@@ -12,6 +12,12 @@ dataset: # Dataset configuration
   img_path : img_path                                             # column name containing absolute or relative image path from root
   particle_id : event_id                                          # how to identify the same particle object
 
+transforms:
+  name: base_transform
+  img_interpolation : 224                                         # size after interpolation or "Null"
+  gaussian_blur : False                                           # whether to apply gaussian blur
+  random_resized_crop : False                                     # whether to apply random resized crop
+
 training :
   lr : 0.00005
   batch_size : 64

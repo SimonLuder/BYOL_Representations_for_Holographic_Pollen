@@ -183,6 +183,7 @@ def main(config_path):
     # Config
     conf = config.load(config_path)
     dataset_conf = conf["dataset"]
+    transform_conf = conf.get("transforms", {})
     train_conf = conf["training"]
     model_conf = conf["byol"]
     cond_conf = conf.get("conditioning", {})
@@ -205,31 +206,52 @@ def main(config_path):
         config=conf_flat,
     )
 
-    # Transformations
-    transforms_list = [transforms.ToTensor()]
-    if dataset_conf.get("img_interpolation"):
+    def get_transform(transform_conf, img_size, img_channels):
+        
+        # Transformations
+        transforms_list = [transforms.ToTensor()]
+
+        if transform_conf.get("img_interpolation"):
+            print("Using image interpolation:", transform_conf["img_interpolation"])
+            transforms_list.append(
+                transforms.Resize(
+                    (transform_conf["img_interpolation"], 
+                     transform_conf["img_interpolation"]),
+                    interpolation=transforms.InterpolationMode.BILINEAR,
+                )
+            )
         transforms_list.append(
-            transforms.Resize(
-                (dataset_conf["img_interpolation"], 
-                 dataset_conf["img_interpolation"]),
-                interpolation=transforms.InterpolationMode.BILINEAR,
+            transforms.Normalize(
+                [0.5,] * img_channels,
+                [0.5,] * img_channels,
             )
         )
+        if transform_conf.get("gaussian_blur"):
+            print("Using GaussianBlur augmentation")
+            transforms_list.append(
+                transforms.RandomApply(
+                    transforms.GaussianBlur((3, 3), (1.0, 2.0)),
+                    p = 0.2
+                )
+            )
 
-    transforms_list.append(
-        transforms.Normalize(
-            [0.5,] * dataset_conf["img_channels"],
-            [0.5,] * dataset_conf["img_channels"],
-        )
-    )
+        if transform_conf.get("random_resized_crop"):
+            print("Using RandomResizedCrop augmentation")
+            transforms.RandomResizedCrop(
+                size=dataset_conf.get("img_interpolation", img_size),   # output size == original size
+                scale=(0.9, 1.0),                                       # keep 90–100% of the image
+                ratio=(1.0, 1.0),                                       # preserve aspect ratio
+            )
 
-    transform = transforms.Compose(transforms_list)
+        return transforms.Compose(transforms_list)
+    
+    transform = get_transform(transform_conf, dataset_conf.get("img_size", 1), dataset_conf.get("img_channels", 1))
 
     # Check if labels fies exist
     if not os.path.isfile(dataset_conf["labels_train"]):
         raise FileNotFoundError(f'File {dataset_conf["labels_train"]} does not exist')
     if not os.path.isfile(dataset_conf["labels_val"]):
-        raise FileNotFoundError(f'File {dataset_conf["labels_val"]} does not  exist')
+        raise FileNotFoundError(f'File {dataset_conf["labels_val"]} does not exist')
     
     # Datasets
     dataset_train = PairwiseHolographyImageFolder(
