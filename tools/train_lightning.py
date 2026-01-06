@@ -81,7 +81,6 @@ class BYOLLightningModule(pl.LightningModule):
         emb = torch.cat([emb1, emb2], dim=0)
         self.val_embeddings.append(emb.detach().cpu())
 
-
         if self.val_knn == True and label1.get("class") is not None:
             labels = torch.cat([label1.get("class"), label2.get("class")], dim=0)
             self.val_knn_labels.append(labels.detach().cpu())
@@ -125,7 +124,7 @@ class BYOLLightningModule(pl.LightningModule):
 
             if self.trainer.is_global_zero:
                 knn_acc = self.knn_accuracy(emb, lbl, k=10)
-                self.log("val_knn_acc_epoch", knn_acc)
+                self.log("val_knn_acc_epoch", knn_acc, on_epoch=True)
 
         # Embedding stats (local stats are fine here)
         embeddings = torch.cat(self.val_embeddings, dim=0)
@@ -135,7 +134,6 @@ class BYOLLightningModule(pl.LightningModule):
         # Clear buffers
         self.val_embeddings.clear()
         self.val_knn_labels.clear()
-
 
 
     def configure_optimizers(self):
@@ -324,18 +322,27 @@ def main(config_path):
     best_checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=checkpoint_dir,
         filename="best_{epoch}-{step}-{val_loss:.4f}",
-        save_top_k=3,
+        save_top_k=1,
         monitor="val_loss",
         mode="min",
         save_last=True,
     )
 
-    epoch_checkpoint_callback = pl.callbacks.ModelCheckpoint(
+    # epoch_checkpoint_callback = pl.callbacks.ModelCheckpoint(
+    #     dirpath=checkpoint_dir,
+    #     filename="epoch_{epoch}-{step}-{val_loss:.4f}",
+    #     save_top_k=-1,               
+    #     every_n_epochs=10,            
+    #     save_last=True,
+    # )
+
+    knn_checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=checkpoint_dir,
-        filename="epoch_{epoch}-{step}-{val_loss:.4f}",
-        save_top_k=-1,               
-        every_n_epochs=10,            
-        save_last=True,
+        filename="best_knn_{epoch}-{step}-{val_knn_acc_epoch:.4f}",
+        monitor="val_knn_acc_epoch",
+        mode="max",                 
+        save_top_k=1,
+        save_last=False,
     )
 
     global_batch_size = (
@@ -373,7 +380,7 @@ def main(config_path):
         strategy=strategy,
         num_nodes=train_conf.get("num_nodes", 1),
         devices=train_conf.get("num_devices", 1),
-        callbacks=[best_checkpoint_callback, epoch_checkpoint_callback],
+        callbacks=[best_checkpoint_callback, knn_checkpoint_callback],
         logger=wandb_logger,
         log_every_n_steps=50,
         val_check_interval=train_conf.get("validation_step", 100) * train_conf["accumulate_grad_batches"], # Global steps
