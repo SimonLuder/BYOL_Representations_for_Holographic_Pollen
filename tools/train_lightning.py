@@ -228,17 +228,19 @@ def main(config_path):
             print("Using GaussianBlur augmentation")
             transforms_list.append(
                 transforms.RandomApply(
-                    transforms.GaussianBlur((3, 3), (1.0, 2.0)),
-                    p = 0.2
+                    [transforms.GaussianBlur((3, 3), (1.0, 2.0))],
+                    p=0.2
                 )
             )
 
         if transform_conf.get("random_resized_crop"):
             print("Using RandomResizedCrop augmentation")
-            transforms.RandomResizedCrop(
-                size=dataset_conf.get("img_interpolation", img_size),   # output size == original size
-                scale=(0.9, 1.0),                                       # keep 90–100% of the image
-                ratio=(1.0, 1.0),                                       # preserve aspect ratio
+            transforms_list.append(
+                transforms.RandomResizedCrop(
+                    size=dataset_conf.get("img_interpolation", img_size),
+                    scale=(0.9, 1.0),
+                    ratio=(1.0, 1.0),
+                )
             )
 
         return transforms.Compose(transforms_list)
