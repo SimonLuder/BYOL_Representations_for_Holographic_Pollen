@@ -30,15 +30,15 @@ training :
 byol:
   backbone : "resnet50"                                 # backbone architecture
   pretrained : True                                     # load backbone pretrained if True
-  hidden_layer : "fc"                                   # layer from which to extract embedding features in backbone
+  hidden_layer : "avgpool"                              # layer from which to extract embedding features in backbone
   embedding_size : 256                                  # size of the embedding output
   projection_size : 256                                 # size of the projection output
   projection_hidden_size : 4096                         # size of the hidden layer in the projection MLP
   moving_average_decay : 0.99                           # exponential moving average decay for target network
   use_momentum : True                                   # whether to use momentum encoder
-  use_vitreg: False
-  lambda_var_emb : 0.0003
-  lamda_cov_emb : 0.00001
+  use_vicreg: False
+  lambda_var : 1
+  lambda_cov : 0.04
   val_knn : True
 
 conditioning: # For knn validation only

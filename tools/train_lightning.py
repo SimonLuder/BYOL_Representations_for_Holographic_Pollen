@@ -18,10 +18,10 @@ from byol_poleno.model import BYOLWithTwoImages
 from byol_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
 
 
-class BYOLLightningModule(pl.LightningModule):
+class LITSSLDistilator(pl.LightningModule):
     def __init__(self, backbone, image_size, image_channels, hidden_layer="avgpool", projection_size=256, projection_hidden_size=4096, 
                  augment_fn=torch.nn.Identity(), augment_fn2=None, moving_average_decay=0.99, use_momentum=True, lr=3e-4, 
-                 use_vitreg=False, lambda_var_emb=10.0, lambda_cov_emb=0.5, val_knn=False,
+                 use_vicreg=False, lambda_var=1, lambda_cov=0.04, val_knn=False,
                  ):
         super().__init__()
         self.model = BYOLWithTwoImages(
@@ -36,9 +36,9 @@ class BYOLLightningModule(pl.LightningModule):
             moving_average_decay=moving_average_decay,
             use_momentum=use_momentum,
             sync_batchnorm=True if torch.cuda.device_count() > 1 else False,
-            use_vitreg=use_vitreg,
-            lambda_var_emb=lambda_var_emb,
-            lambda_cov_emb=lambda_cov_emb,
+            use_vicreg=use_vicreg,
+            lambda_var=lambda_var,
+            lambda_cov=lambda_cov,
         )
         self.lr = lr
         self.best_val_loss = float("inf")
@@ -301,7 +301,7 @@ def main(config_path):
         backbone = update_linear_layer(backbone, layer=model_conf["hidden_layer"], out_features=model_conf["embedding_size"])
 
     # Lightning model
-    model = BYOLLightningModule(
+    model = LITSSLDistilator(
         backbone=backbone,
         image_size=dataset_conf.get("img_interpolation", dataset_conf["img_size"]),
         image_channels=dataset_conf.get("img_channels", 1),
@@ -313,9 +313,9 @@ def main(config_path):
         moving_average_decay=model_conf.get("moving_average_decay", 0.99),
         use_momentum=model_conf.get("use_momentum", True),
         lr=train_conf["lr"],
-        use_vitreg=model_conf.get("use_vitreg", False),
-        lambda_var_emb=model_conf.get("lambda_var_emb", 25),
-        lambda_cov_emb=model_conf.get("lamda_cov_emb", 1),
+        use_vicreg=model_conf.get("use_vicreg", False),
+        lambda_var=model_conf.get("lambda_var", 1),
+        lambda_cov=model_conf.get("lambda_cov", 0.04),
         val_knn=model_conf.get("val_knn", False),
     )
 

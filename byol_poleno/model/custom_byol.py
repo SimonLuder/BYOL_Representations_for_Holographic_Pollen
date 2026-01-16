@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms as T
 from byol_pytorch.byol_pytorch import RandomApply, NetWrapper, EMA, MLP, default, get_module_device, update_moving_average, set_requires_grad, singleton
-
+from ..model.vicreg import variance_loss, covariance_loss, invariance_loss
 
 def loss_fn(x, y):
     """
@@ -22,27 +22,6 @@ def loss_fn(x, y):
     x = F.normalize(x, dim=-1, p=2)
     y = F.normalize(y, dim=-1, p=2)
     return 2 - 2 * (x * y).sum(dim=-1)
-
-
-def variance_loss(z, eps=1e-4):
-    """
-    z: (batch_size, dim)
-    """
-    std = torch.sqrt(z.var(dim=0) + eps)
-    return torch.mean(F.relu(1.0 - std))
-
-
-def covariance_loss(z):
-    """
-    z: (batch_size, dim)
-    """
-    z = z - z.mean(dim=0)
-    batch_size, dim = z.shape
-
-    cov = (z.T @ z) / (batch_size - 1)
-    off_diag = cov.flatten()[1:].view(dim - 1, dim + 1)[:, :-1]
-
-    return (off_diag ** 2).sum() / dim
 
 
 class BYOLWithTwoImages(nn.Module):
@@ -63,9 +42,9 @@ class BYOLWithTwoImages(nn.Module):
         moving_average_decay = 0.99,
         use_momentum = True,
         sync_batchnorm = None,
-        use_vitreg = False, 
-        lambda_var_emb = 10.0,
-        lambda_cov_emb = 0.5,
+        use_vicreg = False, 
+        lambda_var = 1,
+        lambda_cov = 0.04,
         ):
         super().__init__()
         self.net = net
@@ -111,10 +90,10 @@ class BYOLWithTwoImages(nn.Module):
         device = get_module_device(net)
         self.to(device)
 
-        # VITReg
-        self.use_vitreg = use_vitreg
-        self.lambda_var_emb = lambda_var_emb
-        self.lambda_cov_emb = lambda_cov_emb
+        # VICReg
+        self.use_vicreg = use_vicreg
+        self.lambda_var = lambda_var
+        self.lambda_cov = lambda_cov
 
         # send a mock image tensor to instantiate singleton parameters
         self.forward(torch.randn(2, image_channels, image_size, image_size, device=device))
@@ -164,33 +143,45 @@ class BYOLWithTwoImages(nn.Module):
             images = torch.cat((x1, x2), dim=0)
 
         online_projections, online_embeddings = self.online_encoder(images) # Backbone + Projector
-        online_predictions = self.online_predictor(online_projections) # Predictor head
 
-        online_pred_one, online_pred_two = online_predictions.chunk(2, dim=0) # Split samples
+        if self.use_vicreg:
+            # VICReg
+            online_proj_one, online_proj_two = online_projections.chunk(2, dim=0)
+
+        else:
+            # BYOL & SimSiam
+            online_predictions = self.online_predictor(online_projections) # Predictor head
+            online_pred_one, online_pred_two = online_predictions.chunk(2, dim=0) # Split samples
+
 
         # Target encoder is either the momentum updated net or just the online encoder
         with torch.no_grad(): 
-            target_encoder = self._get_target_encoder() if self.use_momentum else self.online_encoder
+            target_encoder = self._get_target_encoder() if (self.use_momentum and not self.use_vicreg) else self.online_encoder
             target_projections, _ = target_encoder(images) # Backbone + Projector
             target_projections = target_projections.detach()
 
             target_proj_one, target_proj_two = target_projections.chunk(2, dim=0) # Split
 
-        loss_one = loss_fn(online_pred_one, target_proj_two.detach()) # Loss online1 to target2
-        loss_two = loss_fn(online_pred_two, target_proj_one.detach()) # Loss online2 to target1
-
-        loss = (loss_one + loss_two).mean()
-
-        # VICReg on embeddings
-        if self.use_vitreg:
-            emb_one, emb_two = online_embeddings.chunk(2, dim=0)
-            var_emb = variance_loss(emb_one) + variance_loss(emb_two)
-            cov_emb = covariance_loss(emb_one) + covariance_loss(emb_two)
+        if self.use_vicreg:
+            # VICReg
+            # loss_one = invariance_loss(online_proj_one, target_proj_two.detach())
+            # loss_two = invariance_loss(online_proj_two, target_proj_one.detach())
+            # loss = 0.5 * (loss_one + loss_two)
+            loss = invariance_loss(online_proj_one, target_proj_two)
+            
+            var_emb = variance_loss(online_proj_one) + variance_loss(online_proj_two)
+            cov_emb = covariance_loss(online_proj_one) + covariance_loss(online_proj_two)
 
             loss = (
                 loss
-                + var_emb * self.lambda_var_emb
-                + cov_emb * self.lambda_cov_emb
+                + var_emb * self.lambda_var
+                + cov_emb * self.lambda_cov
                 )
-        
+            
+        else:
+            # BYOL & SimSiam
+            loss_one = loss_fn(online_pred_one, target_proj_two.detach()) # Loss online1 to target2
+            loss_two = loss_fn(online_pred_two, target_proj_one.detach()) # Loss online2 to target1
+            loss = (loss_one + loss_two).mean()
+
         return loss
