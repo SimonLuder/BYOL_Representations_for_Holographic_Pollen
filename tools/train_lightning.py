@@ -44,7 +44,9 @@ class LITSSLDistilator(pl.LightningModule):
         self.best_val_loss = float("inf")
         self.val_embeddings = []
         self.val_knn = val_knn
-        self.val_knn_labels = []    
+        self.val_knn_labels = []
+        self.val_knn_labels_event = []
+        self.val_pair_sims = []
 
 
     def training_step(self, batch, batch_idx):
@@ -81,9 +83,18 @@ class LITSSLDistilator(pl.LightningModule):
         emb = torch.cat([emb1, emb2], dim=0)
         self.val_embeddings.append(emb.detach().cpu())
 
+        pair_sim = self.pairwise_cosine_similarity(emb1, emb2)
+        self.val_pair_sims.append(pair_sim.detach().cpu())
+
+        # Class
         if self.val_knn == True and label1.get("class") is not None:
             labels = torch.cat([label1.get("class"), label2.get("class")], dim=0)
             self.val_knn_labels.append(labels.detach().cpu())
+
+        # Event
+        if self.val_knn == True and label1.get("event") is not None:
+            labels = torch.cat([label1.get("event"), label2.get("event")], dim=0)
+            self.val_knn_labels_event.append(labels.detach().cpu())
 
         local_bs = im1.size(0)
 
@@ -97,34 +108,52 @@ class LITSSLDistilator(pl.LightningModule):
 
         if not self.val_embeddings:
             return
+        
+        # Event-wise similarity
+        self.log_pairwise_sim()
 
         # Local embeddings: (N, D)
         emb = torch.cat(self.val_embeddings, dim=0).to(self.device)
 
-        if self.val_knn and self.val_knn_labels:
-            # Local labels: (N,)
-            lbl = torch.cat(self.val_knn_labels, dim=0).to(self.device)
+        if self.val_knn:
 
             # Gather across GPUs
             emb = self.all_gather(emb)
-            lbl = self.all_gather(lbl)
-
+            
             # DDP case: (world_size, N, D) -> (world_size * N, D)
             if emb.dim() == 3:
                 emb = emb.flatten(0, 1)
 
-            # DDP case: (world_size, N) -> (world_size * N,)
-            if lbl.dim() > 1:
-                lbl = lbl.flatten()
+            # Class
+            if self.val_knn_labels:
+                
+                lbl = torch.cat(self.val_knn_labels, dim=0).to(self.device)         # Local labels: (N,)
+                lbl = self.all_gather(lbl)                                          # Gather across GPUs
+                if lbl.dim() > 1:                                                   # DDP case: (world_size, N) -> (world_size * N,)
+                    lbl = lbl.flatten()
 
-            # Sanity checks (safe to remove later)
-            assert emb.dim() == 2, emb.shape
-            assert lbl.dim() == 1, lbl.shape
-            assert emb.shape[0] == lbl.shape[0]
+                assert emb.dim() == 2, emb.shape                                    # Sanity checks
+                assert lbl.dim() == 1, lbl.shape
+                assert emb.shape[0] == lbl.shape[0]
 
-            if self.trainer.is_global_zero:
-                knn_acc = self.knn_accuracy(emb, lbl, k=10)
-                self.log("val_knn_acc_epoch", knn_acc, on_epoch=True)
+                if self.trainer.is_global_zero:
+                    knn_acc = self.knn_accuracy(emb, lbl, k=10)
+                    self.log("val_knn_acc_epoch", knn_acc, on_epoch=True)
+
+            # Event
+            if self.val_knn_labels_event:
+                lble = torch.cat(self.val_knn_labels_event, dim=0).to(self.device)  # Local labels: (N,)
+                lble = self.all_gather(lble)                                        # Gather across GPUs
+                if lble.dim() > 1:                                                  # DDP case: (world_size, N) -> (world_size * N,)
+                    lble = lble.flatten()
+
+                assert emb.dim() == 2, emb.shape                                    # Sanity checks
+                assert lble.dim() == 1, lble.shape
+                assert emb.shape[0] == lble.shape[0]
+
+                if self.trainer.is_global_zero:
+                    knn_acc_e = self.knn_accuracy(emb, lble, k=1)
+                    self.log("val_event_knn_acc_epoch", knn_acc_e, on_epoch=True)
 
         # Embedding stats (local stats are fine here)
         embeddings = torch.cat(self.val_embeddings, dim=0)
@@ -134,6 +163,8 @@ class LITSSLDistilator(pl.LightningModule):
         # Clear buffers
         self.val_embeddings.clear()
         self.val_knn_labels.clear()
+        self.val_knn_labels_event.clear()
+        self.val_pair_sims.clear()
 
 
     def configure_optimizers(self):
@@ -160,6 +191,17 @@ class LITSSLDistilator(pl.LightningModule):
         emb = torch.cat([emb1, emb2], dim=0)
         emb_std = emb.std(dim=0).mean()
         return emb_std
+
+    @staticmethod
+    @torch.no_grad()
+    def pairwise_cosine_similarity(emb1, emb2):
+        # Normalize for cosine similarity
+        emb1_n = F.normalize(emb1, dim=1)
+        emb2_n = F.normalize(emb2, dim=1)
+
+        # Same-event similarity (index-aligned)
+        pair_sim = (emb1_n * emb2_n).sum(dim=1)  # (B,)
+        return pair_sim
     
 
     @staticmethod
@@ -174,7 +216,28 @@ class LITSSLDistilator(pl.LightningModule):
 
         return (preds == labels).float().mean()
     
-    
+
+    def log_pairwise_sim(self):
+        if not self.val_pair_sims:
+            return
+
+        pair_sim = torch.cat(self.val_pair_sims, dim=0).to(self.device)
+
+        # Gather across GPUs
+        pair_sim = self.all_gather(pair_sim)
+
+        # (world_size, N) → (world_size * N,)
+        if pair_sim.dim() > 1:
+            pair_sim = pair_sim.flatten()
+
+        avg_sim = pair_sim.mean()
+        std_sim = pair_sim.std()
+
+        if self.trainer.is_global_zero:
+            self.log("val_same_event_similarity", avg_sim, on_epoch=True)
+            self.log("val_same_event_similarity_std", std_sim, on_epoch=True)
+                
+        
 
 def main(config_path):
 

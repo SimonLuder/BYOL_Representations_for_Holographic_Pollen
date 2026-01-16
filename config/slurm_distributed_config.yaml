@@ -42,9 +42,13 @@ byol:
   val_knn : True
 
 conditioning: # For knn validation only
-  enabled: "class"
+  enabled: "class+event"
   encoders: 
     class: 
       type: categorical
       encoder: Embedding
       use_columns: species_norm_enum
+    event: 
+      type: categorical
+      encoder: Embedding
+      use_columns: event_id_enum

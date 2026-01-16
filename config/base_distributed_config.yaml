@@ -5,7 +5,7 @@ dataset : # Dataset configuration
   img_channels : 1                                                # grayscale images
   img_size : 200                                                  # original image size
   img_interpolation : 224                                         # size after interpolation or "Null"
-  labels_train : data/final/poleno/basic_train.csv                # training labels
+  labels_train : data/final/poleno/basic_val_20.csv                # training labels
   labels_val : data/final/poleno/basic_val_20.csv                 # validation labels
   labels_test : data/final/poleno/basic_test_20.csv               # test labels
   filenames : rec_path                                            # column name containing filenames
@@ -42,9 +42,13 @@ byol:
   val_knn : True
   
 conditioning: # For knn validation only
-  enabled: "class"
+  enabled: "class+event"
   encoders: 
     class: 
       type: categorical
       encoder: Embedding
       use_columns: species_norm_enum
+    event: 
+        type: categorical
+        encoder: Embedding
+        use_columns: event_id_enum
