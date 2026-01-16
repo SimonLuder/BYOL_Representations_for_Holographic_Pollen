@@ -1,8 +1,8 @@
 import subprocess
 import torch
-import requests
 from pathlib import Path
 import os
+import re
 
 
 def scp_download_model_folder(source: str, target: str):
@@ -68,3 +68,55 @@ def extract_backbone_state_dict_from_lightning_ckpt(
         print(f"Saved backbone weights to {save_path}")
 
     return backbone_state_dict
+
+
+def get_best_checkpoint_by_val_loss(ckpt_dir):
+    """
+    Returns the filename of the checkpoint with the lowest val_loss.
+    Ignores files without 'val_loss=' in the name.
+    """
+    best_ckpt = None
+    best_loss = float("inf")
+
+    pattern = re.compile(r"val_loss=([0-9]*\.?[0-9]+)")
+
+    for fname in os.listdir(ckpt_dir):
+        if not fname.endswith(".ckpt"):
+            continue
+
+        match = pattern.search(fname)
+        if match is None:
+            continue
+
+        val_loss = float(match.group(1))
+        if val_loss < best_loss:
+            best_loss = val_loss
+            best_ckpt = fname
+
+    return best_ckpt
+
+
+def get_best_checkpoint_by_val_knn_acc(ckpt_dir):
+    """
+    Returns the filename of the checkpoint with the highest val_knn_acc_epoch.
+    Ignores files without 'val_knn_acc_epoch=' in the name.
+    """
+    best_ckpt = None
+    best_acc = float("-inf")
+
+    pattern = re.compile(r"val_knn_acc_epoch=([0-9]*\.?[0-9]+)")
+
+    for fname in os.listdir(ckpt_dir):
+        if not fname.endswith(".ckpt"):
+            continue
+
+        match = pattern.search(fname)
+        if match is None:
+            continue
+
+        acc = float(match.group(1))
+        if acc > best_acc:
+            best_acc = acc
+            best_ckpt = fname
+
+    return best_ckpt
