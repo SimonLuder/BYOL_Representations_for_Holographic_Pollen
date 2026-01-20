@@ -5,23 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms as T
 from byol_pytorch.byol_pytorch import RandomApply, NetWrapper, EMA, MLP, default, get_module_device, update_moving_average, set_requires_grad, singleton
-from ..model.vicreg import variance_loss, covariance_loss, invariance_loss
-
-def loss_fn(x, y):
-    """
-    Computes the negative cosine similarity loss between two sets of vectors.
-
-    Args:
-        x (Tensor): Predicted feature vectors of shape (batch_size, dim).
-        y (Tensor): Target feature vectors of shape (batch_size, dim).
-
-    Returns:
-        Tensor: A loss tensor of shape (batch_size,) with values in [0, 4], where
-                lower values indicate more similar (aligned) vectors.
-    """
-    x = F.normalize(x, dim=-1, p=2)
-    y = F.normalize(y, dim=-1, p=2)
-    return 2 - 2 * (x * y).sum(dim=-1)
+from .losses import variance_loss, covariance_loss, invariance_loss, neg_cosine
 
 
 class BYOLWithTwoImages(nn.Module):
@@ -180,8 +164,8 @@ class BYOLWithTwoImages(nn.Module):
             
         else:
             # BYOL & SimSiam
-            loss_one = loss_fn(online_pred_one, target_proj_two.detach()) # Loss online1 to target2
-            loss_two = loss_fn(online_pred_two, target_proj_one.detach()) # Loss online2 to target1
+            loss_one = neg_cosine(online_pred_one, target_proj_two.detach()) # Loss online1 to target2
+            loss_two = neg_cosine(online_pred_two, target_proj_one.detach()) # Loss online2 to target1
             loss = (loss_one + loss_two).mean()
 
         return loss
