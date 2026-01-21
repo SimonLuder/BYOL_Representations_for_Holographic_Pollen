@@ -16,11 +16,11 @@ dataset: # Dataset configuration
 transforms:
   name: base_transform
   img_interpolation : 224                                         # size after interpolation or "Null"
-  gaussian_blur : False                                           # whether to apply gaussian blur
-  random_resized_crop : False                                     # whether to apply random resized crop
+  gaussian_blur : True                                           # whether to apply gaussian blur
+  random_resized_crop : True                                     # whether to apply random resized crop
 
 training :
-  lr : 0.00005
+  lr : 0.0005
   batch_size : 64
   num_epochs : 25
   validation_step : 50

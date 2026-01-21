@@ -45,6 +45,12 @@ def main(config_path):
         name=run_name,
         config=conf_flat,
     )
+    checkpoint_dir = os.path.join("checkpoints", run_name)
+
+    # Save config file to checkpoint directory
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    destination = os.path.join(checkpoint_dir, os.path.basename(config_path))
+    shutil.copy2(config_path, destination)
 
     def get_transform(transform_conf, img_size, img_channels):
         
@@ -84,7 +90,6 @@ def main(config_path):
                     ratio=(1.0, 1.0),
                 )
             )
-
         return transforms.Compose(transforms_list)
     
     transform = get_transform(transform_conf, dataset_conf.get("img_size", 1), dataset_conf.get("img_channels", 1))
@@ -182,7 +187,6 @@ def main(config_path):
     )
 
     # Callbacks
-    checkpoint_dir = os.path.join("checkpoints", run_name)
     best_checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=checkpoint_dir,
         filename="best_{epoch}-{step}-{val_loss:.4f}",
@@ -221,11 +225,6 @@ def main(config_path):
     **train_conf,
     "global_batch_size": global_batch_size
     })
-
-    # Save config file to checkpoint directory
-    os.makedirs(checkpoint_dir, exist_ok=True)
-    destination = os.path.join(checkpoint_dir, os.path.basename(config_path))
-    shutil.copy2(config_path, destination)
 
     print(f"✅ Global batch size: {global_batch_size}")
     print("Num_devices:", torch.cuda.device_count())
