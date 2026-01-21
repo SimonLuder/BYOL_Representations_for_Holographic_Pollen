@@ -2,7 +2,7 @@ import os
 import shutil
 import argparse
 from datetime import datetime, timedelta
-from pollen_datasets.poleno import PairwiseHolographyImageFolder
+from pollen_datasets.poleno import HolographyImageFolder, PairwiseHolographyImageFolder
 
 import torch
 from torch.utils.data import DataLoader
@@ -14,6 +14,7 @@ from pytorch_lightning.strategies import DDPStrategy
 
 from byol_poleno.utils import config
 from byol_poleno.model.lightning import LITSSLModel
+from byol_poleno.model.objectives import NormalizedL2Objective, VICRegObjective
 from byol_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
         
 
@@ -24,7 +25,7 @@ def main(config_path):
     dataset_conf = conf["dataset"]
     transform_conf = conf.get("transforms", {})
     train_conf = conf["training"]
-    model_conf = conf["byol"]
+    model_conf = conf["ssl"]
     cond_conf = conf.get("conditioning", {})
 
     pl.seed_everything(42, workers=True)
@@ -38,7 +39,7 @@ def main(config_path):
         else:
             conf_flat[section_name] = section_conf
 
-    run_name = f"byol_lightning_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    run_name = f"{model_conf['objective']}_lit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     wandb_logger = WandbLogger(
         project="ByolHolographicPollen",
         name=run_name,
@@ -95,23 +96,26 @@ def main(config_path):
         raise FileNotFoundError(f'File {dataset_conf["labels_val"]} does not exist')
     
     # Datasets
-    dataset_train = PairwiseHolographyImageFolder(
+    dataset = PairwiseHolographyImageFolder if dataset_conf["paired_images"] else HolographyImageFolder
+    
+    dataset_train = dataset(
         root=dataset_conf["root"],
         transform=transform,
         dataset_cfg=dataset_conf,
         labels=dataset_conf.get("labels_train"),
         verbose=True,
     )
+
     dataset_val = None
     if dataset_conf.get("labels_val"):
-        dataset_val = PairwiseHolographyImageFolder(
+        dataset_val = dataset(
             root=dataset_conf["root"],
             transform=transform,
             dataset_cfg=dataset_conf,
             cond_cfg=cond_conf,
             labels=dataset_conf.get("labels_val"),
             verbose=True,
-        )
+    )
 
     # DataLoaders
     dataloader_train = DataLoader(
@@ -123,6 +127,7 @@ def main(config_path):
         pin_memory=True,
         drop_last=True,
     )
+
     dataloader_val = None
     if dataset_val:
         dataloader_val = DataLoader(
@@ -141,22 +146,38 @@ def main(config_path):
     if model_conf["embedding_size"] is not None:
         backbone = update_linear_layer(backbone, layer=model_conf["hidden_layer"], out_features=model_conf["embedding_size"])
 
+    # Objective
+    objective_name = str(model_conf["objective"]).lower()
+
+    if objective_name in ["byol", "simsiam"]:
+        objective = NormalizedL2Objective()
+
+    elif objective_name == "vitreg":
+        objective = VICRegObjective(
+            lambda_inv=model_conf.get("lambda_inv", 1),
+            lambda_var=model_conf.get("lambda_var", 1),
+            lambda_cov=model_conf.get("lambda_cov", 0.04))
+        
+    else: 
+        raise ValueError(
+        f'Invalid objective "{objective_name}". '
+        'Choose from ["byol", "simsiam", "vitreg"].'
+        )
+
     # Lightning model
     model = LITSSLModel(
         backbone=backbone,
+        objective=objective,
         image_size=dataset_conf.get("img_interpolation", dataset_conf["img_size"]),
         image_channels=dataset_conf.get("img_channels", 1),
         hidden_layer=model_conf.get("hidden_layer", "avgpool"),
         projection_size=model_conf.get("projection_size", 256),
         projection_hidden_size=model_conf.get("projection_hidden_size", 4096),
-        augment_fn=torch.nn.Identity(),
+        augment_fn=torch.nn.Identity(), # TODO Update for single image training
         augment_fn2=None,
         moving_average_decay=model_conf.get("moving_average_decay", 0.99),
         use_momentum=model_conf.get("use_momentum", True),
         lr=train_conf["lr"],
-        use_vicreg=model_conf.get("use_vicreg", False),
-        lambda_var=model_conf.get("lambda_var", 1),
-        lambda_cov=model_conf.get("lambda_cov", 0.04),
         val_knn=model_conf.get("val_knn", False),
     )
 
@@ -171,18 +192,19 @@ def main(config_path):
         save_last=True,
     )
 
-    # epoch_checkpoint_callback = pl.callbacks.ModelCheckpoint(
-    #     dirpath=checkpoint_dir,
-    #     filename="epoch_{epoch}-{step}-{val_loss:.4f}",
-    #     save_top_k=-1,               
-    #     every_n_epochs=10,            
-    #     save_last=True,
-    # )
-
     knn_checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=checkpoint_dir,
         filename="best_knn_{epoch}-{step}-{val_knn_acc_epoch:.4f}",
         monitor="val_knn_acc_epoch",
+        mode="max",                 
+        save_top_k=1,
+        save_last=False,
+    )
+
+    mrr_checkpoint_callback = pl.callbacks.ModelCheckpoint(
+        dirpath=checkpoint_dir,
+        filename="best_mrr_{epoch}-{step}-{val_event_mrr_epoch:.4f}",
+        monitor="val_event_mrr_epoch",
         mode="max",                 
         save_top_k=1,
         save_last=False,
@@ -223,7 +245,7 @@ def main(config_path):
         strategy=strategy,
         num_nodes=train_conf.get("num_nodes", 1),
         devices=train_conf.get("num_devices", 1),
-        callbacks=[best_checkpoint_callback, knn_checkpoint_callback],
+        callbacks=[best_checkpoint_callback, knn_checkpoint_callback, mrr_checkpoint_callback],
         logger=wandb_logger,
         log_every_n_steps=50,
         val_check_interval=train_conf.get("validation_step", 100) * train_conf["accumulate_grad_batches"], # Global steps
