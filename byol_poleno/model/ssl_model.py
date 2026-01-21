@@ -103,19 +103,26 @@ class SelfSupervisedLearner(nn.Module):
         x1,
         x2=None,
         return_embedding=False,
-        return_projection=True
+        return_projection=True,
+        validation=False,
         ):
         
         assert not (self.training and x1.shape[0] == 1), \
             'you must have greater than 1 sample when training, due to the batchnorm in the projection layer'
                
+        # Image augmentations and preprocessing  
         if x2 is None: # Single image
-            if return_embedding:
+            if return_embedding and not validation:
                 return self.online_encoder(x1, return_projection = return_projection)
 
             # Image augmentation to create two distinct samples from x1
-            img1, img2 = self.augment1(x1), self.augment2(x1)
-            images = torch.cat((img1, img2), dim = 0)
+            v1, v2 = self.augment1(x1), self.augment2(x1)
+            images = torch.cat((v1, v2), dim = 0)
+
+            if return_embedding:
+                embedding1 = self.online_encoder(v1, return_projection=return_projection)
+                embedding2 = self.online_encoder(v2, return_projection=return_projection)
+                return embedding1, embedding2
 
         else: # Paired images
             if return_embedding:

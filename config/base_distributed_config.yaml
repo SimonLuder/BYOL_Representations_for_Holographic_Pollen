@@ -5,12 +5,13 @@ dataset : # Dataset configuration
   img_channels : 1                                                # grayscale images
   img_size : 200                                                  # original image size
   img_interpolation : 224                                         # size after interpolation or "Null"
-  labels_train : data/final/poleno/basic_val_20.csv                # training labels
+  labels_train : data/final/poleno/basic_test_20.csv                # training labels
   labels_val : data/final/poleno/basic_val_20.csv                 # validation labels
   labels_test : data/final/poleno/basic_test_20.csv               # test labels
   filenames : rec_path                                            # column name containing filenames
   img_path : img_path                                             # column name containing absolute or relative image path from root
   particle_id : event_id                                          # how to identify the same particle object
+  paired_images : True                                            # If true get two paired images from the dataset
 
 transforms:
   name: base_transform
@@ -27,11 +28,12 @@ training :
   num_devices : 1
   accumulate_grad_batches : 4
 
-byol:
+ssl:
   backbone : "resnet50"                                 # backbone architecture
-  pretrained : False                                    # load backbone pretrained if True
+  objective: "byol"                                     # byol, simsiam or vicreg
+  pretrained : True                                    # load backbone pretrained if True
   hidden_layer : "avgpool"                              # layer from which to extract embedding features in backbone
-  embedding_size : Null                                  # size of the embedding output
+  embedding_size : Null                                 # size of the embedding output
   projection_size : 256                                 # size of the projection output
   projection_hidden_size : 4096                         # size of the hidden layer in the projection MLP
   moving_average_decay : 0.99                           # exponential moving average decay for target network

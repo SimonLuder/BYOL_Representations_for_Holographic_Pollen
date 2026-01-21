@@ -11,6 +11,7 @@ dataset: # Dataset configuration
   filenames : rec_path                                            # column name containing filenames
   img_path : img_path                                             # column name containing absolute or relative image path from root
   particle_id : event_id                                          # how to identify the same particle object
+  paired_images : True                                            # If true get two paired images from the dataset
 
 transforms:
   name: base_transform
@@ -27,18 +28,19 @@ training :
   num_devices : 1
   accumulate_grad_batches : 64
 
-byol:
+ssl:
   backbone : "resnet50"                                 # backbone architecture
+  bjective: "byol"                                      # byol, simsiam or vicreg
   pretrained : True                                     # load backbone pretrained if True
   hidden_layer : "avgpool"                              # layer from which to extract embedding features in backbone
-  embedding_size : 256                                  # size of the embedding output
+  embedding_size : Null                                 # size of the embedding output
   projection_size : 256                                 # size of the projection output
   projection_hidden_size : 4096                         # size of the hidden layer in the projection MLP
   moving_average_decay : 0.99                           # exponential moving average decay for target network
   use_momentum : True                                   # whether to use momentum encoder
-  use_vicreg: False
-  lambda_var : 1
-  lambda_cov : 0.04
+  lambda_inv : 1                                        # (VICReg) Invariance loss strength
+  lambda_var : 1                                        # (VICReg) Variance loss strength
+  lambda_cov : 0.04                                     # (VICReg) Covariance loss strength
   val_knn : True
 
 conditioning: # For knn validation only

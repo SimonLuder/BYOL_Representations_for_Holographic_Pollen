@@ -2,18 +2,17 @@ import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-
-from byol_poleno.model import BYOLWithTwoImages
+from byol_poleno.model import SelfSupervisedLearner
 
 
 class LITSSLModel(pl.LightningModule):
-    def __init__(self, backbone, image_size, image_channels, hidden_layer="avgpool", projection_size=256, projection_hidden_size=4096, 
-                 augment_fn=torch.nn.Identity(), augment_fn2=None, moving_average_decay=0.99, use_momentum=True, lr=3e-4, 
-                 use_vicreg=False, lambda_var=1, lambda_cov=0.04, val_knn=False,
+    def __init__(self, backbone, objective, image_size, image_channels, hidden_layer="avgpool", projection_size=256, projection_hidden_size=4096, 
+                 augment_fn=torch.nn.Identity(), augment_fn2=None, moving_average_decay=0.99, use_momentum=True, lr=3e-4, val_knn=False,
                  ):
         super().__init__()
-        self.model = BYOLWithTwoImages(
+        self.model = SelfSupervisedLearner(
             backbone,
+            objective = objective,
             image_size=image_size,
             image_channels=image_channels,
             hidden_layer=hidden_layer,
@@ -24,9 +23,6 @@ class LITSSLModel(pl.LightningModule):
             moving_average_decay=moving_average_decay,
             use_momentum=use_momentum,
             sync_batchnorm=True if torch.cuda.device_count() > 1 else False,
-            use_vicreg=use_vicreg,
-            lambda_var=lambda_var,
-            lambda_cov=lambda_cov,
         )
         self.lr = lr
         self.best_val_loss = float("inf")
@@ -38,7 +34,7 @@ class LITSSLModel(pl.LightningModule):
 
 
     def training_step(self, batch, batch_idx):
-        (im1, im2), _, _ = batch
+        (im1, im2), _, _ = unpack_batch(batch)
         loss = self.model(x1=im1, x2=im2)
 
         local_bs = im1.size(0)
@@ -63,8 +59,11 @@ class LITSSLModel(pl.LightningModule):
 
 
     def validation_step(self, batch, batch_idx):
-        (im1, im2), (label1, label2), _ = batch
+        (im1, im2), (label1, label2), _ = unpack_batch(batch)
         loss = self.model(x1=im1, x2=im2)
+
+        if label2 is None:
+            label2 = label1
 
         # Store embeddings for epoch-end stats
         emb1, emb2 = self.get_embbedings(im1, im2)
@@ -141,7 +140,10 @@ class LITSSLModel(pl.LightningModule):
 
                 if self.trainer.is_global_zero:
                     knn_acc_e = self.knn_accuracy(emb, lble, k=1)
+                    mrr_e = self.mean_reciprocal_rank(emb, lble)
+
                     self.log("val_event_knn_acc_epoch", knn_acc_e, on_epoch=True)
+                    self.log("val_event_mrr_epoch", mrr_e, on_epoch=True)
 
         # Embedding stats (local stats are fine here)
         embeddings = torch.cat(self.val_embeddings, dim=0)
@@ -171,7 +173,9 @@ class LITSSLModel(pl.LightningModule):
                 x2=x2,
                 return_embedding=True,
                 return_projection=False,
+                validation=True,
             )
+            
         return emb1, emb2
 
 
@@ -225,3 +229,59 @@ class LITSSLModel(pl.LightningModule):
             self.log("val_same_event_similarity", avg_sim, on_epoch=True)
             self.log("val_same_event_similarity_std", std_sim, on_epoch=True)
                 
+
+    @staticmethod
+    @torch.no_grad()
+    def mean_reciprocal_rank(emb, labels):
+        """
+        emb: (N, D) normalized embeddings
+        labels: (N,) integer labels
+        """
+        emb = F.normalize(emb, dim=1)
+
+        # Cosine similarity matrix
+        sim = emb @ emb.T
+        sim.fill_diagonal_(-float("inf"))
+
+        # Sort indices by similarity (descending)
+        ranked_indices = sim.argsort(dim=1, descending=True)
+
+        # Gather labels according to ranking
+        ranked_labels = labels[ranked_indices]  # (N, N)
+
+        # Find first correct match per query
+        correct = ranked_labels == labels.unsqueeze(1)
+
+        # Index of first True (rank is 1-based)
+        ranks = correct.float().argmax(dim=1) + 1
+
+        # Handle cases with no correct match (should not happen, but safe)
+        valid = correct.any(dim=1)
+        reciprocal_ranks = torch.zeros_like(ranks, dtype=torch.float)
+        reciprocal_ranks[valid] = 1.0 / ranks[valid].float()
+
+        return reciprocal_ranks.mean()
+    
+
+def unpack_batch(batch):
+    """
+    Supports:
+      ((im1, im2), (label1, label2), (fname1, fname2))
+      (im, label, fname)
+
+    Returns:
+      (x1, x2), (y1, y2), (z1, z2)
+      (x2, y2 and z2, are None for single-image batches)
+    """
+    images, labels, fnames = batch
+
+    if isinstance(images, (tuple, list)):
+        x1, x2 = images
+        y1, y2 = labels
+        z1, z2 = fnames
+    else:
+        x1, x2 = images, None
+        y1, y2 = labels, None
+        z1, z2 = fnames, None
+
+    return (x1, x2), (y1, y2), (z1, z2)
