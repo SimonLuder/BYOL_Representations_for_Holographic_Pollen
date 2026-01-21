@@ -157,7 +157,7 @@ def main(config_path):
     if objective_name in ["byol", "simsiam"]:
         objective = NormalizedL2Objective()
 
-    elif objective_name == "vitreg":
+    elif objective_name == "vicreg":
         objective = VICRegObjective(
             lambda_inv=model_conf.get("lambda_inv", 1),
             lambda_var=model_conf.get("lambda_var", 1),
@@ -166,7 +166,7 @@ def main(config_path):
     else: 
         raise ValueError(
         f'Invalid objective "{objective_name}". '
-        'Choose from ["byol", "simsiam", "vitreg"].'
+        'Choose from ["byol", "simsiam", "vicreg"].'
         )
 
     # Lightning model
