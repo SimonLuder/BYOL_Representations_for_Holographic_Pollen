@@ -102,3 +102,80 @@ class VICRegObjective(SSLObjective):
             + self.lambda_var * var
             + self.lambda_cov * cov
         )
+    
+
+class HybridObjective(SSLObjective):
+    """
+    Hybrid objective:
+    - SimSiam or Byol style asymmetric invariance
+    - VICReg variance + covariance regularization
+    """
+
+    def __init__(
+        self,
+        lambda_inv: float = 1.0,
+        lambda_var: float = 1.0,
+        lambda_cov: float = 0.04,
+    ):
+        super().__init__()
+        self.lambda_inv = lambda_inv
+        self.lambda_var = lambda_var
+        self.lambda_cov = lambda_cov
+
+    def forward(
+        self,
+        o1: torch.Tensor,
+        o2: torch.Tensor,
+        t1: torch.Tensor,
+        t2: torch.Tensor,
+    ) -> torch.Tensor:
+        inv = invariance_loss(o1, t2)
+        var = variance_loss(o1) + variance_loss(o2)
+        cov = covariance_loss(o1) + covariance_loss(o2)
+
+        return (
+            self.lambda_inv * inv
+            + self.lambda_var * var
+            + self.lambda_cov * cov
+        )
+    
+
+# class HybridObjective(SSLObjective):
+#     """
+#     Hybrid objective:
+#     - SimSiam or Byol style asymmetric invariance
+#     - VICReg variance + covariance regularization
+#     """
+
+#     def __init__(
+#         self,
+#         lambda_inv: float = 1.0,
+#         lambda_var: float = 1.0,
+#         lambda_cov: float = 0.04,
+#     ):
+#         super().__init__()
+#         self.lambda_inv = lambda_inv
+#         self.lambda_var = lambda_var
+#         self.lambda_cov = lambda_cov
+
+#     def forward(
+#         self,
+#         o1: torch.Tensor,
+#         o2: torch.Tensor,
+#         t1: torch.Tensor,
+#         t2: torch.Tensor,
+#     ) -> torch.Tensor:
+#         # BYOL-style invariance (stop-grad happens upstream)
+#         inv_1 = invariance_loss(o1, t2)
+#         inv_2 = invariance_loss(o2, t1)
+#         inv = 0.5 * (inv_1 + inv_2)
+
+#         # VICReg regularization (online only)
+#         var = variance_loss(o1) + variance_loss(o2)
+#         cov = covariance_loss(o1) + covariance_loss(o2)
+
+#         return (
+#             self.lambda_inv * inv
+#             + self.lambda_var * var
+#             + self.lambda_cov * cov
+#         )
