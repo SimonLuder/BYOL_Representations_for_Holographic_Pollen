@@ -156,18 +156,21 @@ def main(config_path):
 
     if objective_name in ["byol", "simsiam"]:
         objective = NormalizedL2Objective()
+        use_prediction_head = True
 
     elif objective_name == "vicreg":
         objective = VICRegObjective(
             lambda_inv=model_conf.get("lambda_inv", 1),
             lambda_var=model_conf.get("lambda_var", 1),
             lambda_cov=model_conf.get("lambda_cov", 0.04))
+        use_prediction_head=False
         
     elif objective_name == "hybrid":
         objective = HybridObjective(
             lambda_inv=model_conf.get("lambda_inv", 1),
             lambda_var=model_conf.get("lambda_var", 1),
             lambda_cov=model_conf.get("lambda_cov", 0.04))
+        use_prediction_head=False
         
     else: 
         raise ValueError(
@@ -190,6 +193,7 @@ def main(config_path):
         use_momentum=model_conf.get("use_momentum", True),
         lr=train_conf["lr"],
         val_knn=model_conf.get("val_knn", False),
+        use_prediction_head=use_prediction_head,
     )
 
     # Callbacks

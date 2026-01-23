@@ -7,7 +7,7 @@ from byol_poleno.model import SelfSupervisedLearner
 
 class LITSSLModel(pl.LightningModule):
     def __init__(self, backbone, objective, image_size, image_channels, hidden_layer="avgpool", projection_size=256, projection_hidden_size=4096, 
-                 augment_fn=torch.nn.Identity(), augment_fn2=None, moving_average_decay=0.99, use_momentum=True, lr=3e-4, val_knn=False,
+                 augment_fn=torch.nn.Identity(), augment_fn2=None, moving_average_decay=0.99, use_momentum=True, use_prediction_head=True, lr=3e-4, val_knn=False,
                  ):
         super().__init__()
         self.model = SelfSupervisedLearner(
@@ -22,6 +22,7 @@ class LITSSLModel(pl.LightningModule):
             augment_fn2=augment_fn2, 
             moving_average_decay=moving_average_decay,
             use_momentum=use_momentum,
+            use_prediction_head=use_prediction_head,
             sync_batchnorm=True if torch.cuda.device_count() > 1 else False,
         )
         self.lr = lr
