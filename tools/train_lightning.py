@@ -14,7 +14,7 @@ from pytorch_lightning.strategies import DDPStrategy
 
 from byol_poleno.utils import config
 from byol_poleno.model.lightning import LITSSLModel
-from byol_poleno.model.objectives import NormalizedL2Objective, VICRegObjective, HybridObjective
+from byol_poleno.model.objectives import NormalizedL2Objective, VICRegObjective, HybridObjective, Hybrid2Objective
 from byol_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
         
 
@@ -171,11 +171,18 @@ def main(config_path):
             lambda_var=model_conf.get("lambda_var", 1),
             lambda_cov=model_conf.get("lambda_cov", 0.04))
         use_prediction_head=False
+
+    elif objective_name == "hybrid2":
+        objective = Hybrid2Objective(
+            lambda_inv=model_conf.get("lambda_inv", 1),
+            lambda_var=model_conf.get("lambda_var", 1),
+            lambda_cov=model_conf.get("lambda_cov", 0.04))
+        use_prediction_head=False
         
     else: 
         raise ValueError(
         f'Invalid objective "{objective_name}". '
-        'Choose from ["byol", "simsiam", "vicreg", "hybrid"].'
+        'Choose from ["byol", "simsiam", "vicreg", "hybrid", "hybrid2"].'
         )
 
     # Lightning model
