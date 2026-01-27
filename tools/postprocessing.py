@@ -1,10 +1,11 @@
 import os
+import argparse
 from .inference import inference
-from byol_poleno.utils import pipeline
-from byol_poleno.utils import config
+from ssl_poleno.utils import pipeline
+from ssl_poleno.utils import config
 
 
-def run_pipeline(force_run=False, localpath="checkpoints/"):
+def run_pipeline(force_run=False, localpath="checkpoints/", config_updates=None):
 
     for model in checkpoint_names:
 
@@ -61,22 +62,20 @@ def run_pipeline(force_run=False, localpath="checkpoints/"):
 if __name__ == "__main__":
 
     checkpoint_names = [
-        "byol_lightning_20260103_232237",
-        "byol_lightning_20260103_233731",
-        "byol_lightning_20260103_234143",
-        "byol_lightning_20260103_234828",
-        "byol_lightning_20260110_173001",
+        "byol_lightning_20260116_163206",
     ]
 
     config_updates = {
     "dataset": {
         "root": "Z:/marvel/marvel-fhnw/data/",
-        "labels_train": "data/final/poleno/basic_train.csv",
-        "labels_val": "data/final/poleno/basic_val_20.csv",
-        "labels_test": "Z:/simon_luder/Data_Setup/Pollen_Datasets/data/final/poleno/isolated_test_20.csv",
+        "labels_test": "data/final/poleno/basic_test_20.csv",
         }
     }   
 
-    path = r"Z:\simon_luder\BYOL\BYOL_Representations_for_Holographic_Pollen\checkpoints"
+    parser = argparse.ArgumentParser(description='Arguments for postprocessing')
+    parser.add_argument('--checkpoints', dest='path', default='checkpoints/', type=str)
+    args = parser.parse_args()
 
-    run_pipeline(force_run=False, localpath=path)
+    args.path = r"Z:\simon_luder\BYOL\BYOL_Representations_for_Holographic_Pollen\checkpoints"
+
+    run_pipeline(force_run=False, localpath=args.path, config_updates=config_updates)

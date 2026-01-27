@@ -4,17 +4,16 @@ import argparse
 from tqdm import tqdm
 
 import torch
-from tools.train import BYOLWithTwoImages
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from pollen_datasets.poleno import PairwiseHolographyImageFolder
 
-from byol_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
-from byol_poleno.utils import config
-from byol_poleno.utils.config import get_ckpt_config_file
+from ssl_poleno.model import SelfSupervisedLearner
+from ssl_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
+from ssl_poleno.utils import config
 
 
-def load_model_weights(model, ckpt_path):
+def load_ssl_model_weights(model, ckpt_path):
     """
     Load weights from either:
       - a Lightning checkpoint (.ckpt)
@@ -45,22 +44,12 @@ def load_model_weights(model, ckpt_path):
     return model
 
 
-def deep_update(d, u):
-    for k, v in u.items():
-        if isinstance(v, dict) and isinstance(d.get(k), dict):
-            deep_update(d[k], v)
-        else:
-            d[k] = v
-    return d
+def inference(ckpt_path, conf, save_as="inference.npz"):
 
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def inference(ckpt_path, config_path, config_updates=None):
-
-    conf = config.load(config_path)
-    if config_updates:
-        conf = deep_update(conf, config_updates)
     dataset_conf = conf["dataset"]
-    model_conf = conf ["byol"]
+    model_conf = conf["ssl"]
 
     # Transformations
     transforms_list = [transforms.ToTensor()]
@@ -74,8 +63,8 @@ def inference(ckpt_path, config_path, config_updates=None):
         )
     transforms_list.append(
         transforms.Normalize(
-            (0.5,) * dataset_conf["img_channels"],
-            (0.5,) * dataset_conf["img_channels"],
+            [0.5,] * dataset_conf["img_channels"],
+            [0.5,] * dataset_conf["img_channels"],
         )
     )
     transform = transforms.Compose(transforms_list)
@@ -107,14 +96,16 @@ def inference(ckpt_path, config_path, config_updates=None):
     # Backbone
     backbone = get_backbone(model_conf["backbone"], pretrained=False)
     backbone = set_single_channel_input(backbone)
-    backbone = update_linear_layer(
-        backbone, 
-        layer=model_conf["hidden_layer"], 
-        out_features=model_conf["embedding_size"]
-    )
+    if model_conf["embedding_size"] is not None:
+        backbone = update_linear_layer(
+            backbone, layer=model_conf["hidden_layer"], 
+            out_features=model_conf["embedding_size"]
+        )
+
+    use_prediction_head = False if model_conf.get("objective", None) in ["vicreg", "hybrid", "hybrid2"] else True
 
     # Recreate BYOL model
-    model = BYOLWithTwoImages(
+    model = SelfSupervisedLearner(
         backbone,
         image_size=dataset_conf.get("img_interpolation", dataset_conf["img_size"]),
         image_channels=dataset_conf.get("img_channels", 1),
@@ -122,15 +113,17 @@ def inference(ckpt_path, config_path, config_updates=None):
         projection_size=model_conf.get("projection_size", 256),
         projection_hidden_size=model_conf.get("projection_hidden_size", 4096),
         augment_fn=torch.nn.Identity(),
-        augment_fn2=None,
+        augment_fn2=torch.nn.Identity(),
         moving_average_decay=model_conf.get("moving_average_decay", 0.99),
         use_momentum=model_conf.get("use_momentum", True),
+        use_prediction_head=use_prediction_head,
     )
 
     # ----------------------------
     # 3. Load weights (fix Lightning prefixes)
     # ----------------------------
-    model = load_model_weights(model, ckpt_path)
+    model = load_ssl_model_weights(model, ckpt_path)
+    model.to(device)
     model.eval()
 
     all_proj1, all_proj2 = [], []
@@ -140,6 +133,9 @@ def inference(ckpt_path, config_path, config_updates=None):
     for (images, _, filenames) in tqdm(dataloader):
         img1, img2 = images
         file1, file2 = filenames
+
+        img1 = img1.to(device)
+        img2 = img2.to(device)
         
         with torch.no_grad():
             ((proj1, emb1), (proj2, emb2)) = model(img1, img2, return_embedding=True, return_projection=True)
@@ -162,12 +158,15 @@ def inference(ckpt_path, config_path, config_updates=None):
 
     # Save in a compressed npz file
     save_dir = os.path.split(ckpt_path)[0]
-    filename = os.path.join(save_dir, "embeddings.npz")
+    filename = os.path.join(save_dir, save_as)
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
+
+    dataset_file = os.path.basename(dataset_conf.get("labels_test"))
     
     np.savez_compressed(
         filename,
+        dataset=dataset_file,
         proj1=all_proj1,
         proj2=all_proj2,
         emb1=all_emb1,
@@ -179,27 +178,26 @@ def inference(ckpt_path, config_path, config_updates=None):
 
 if __name__ == "__main__":
 
-    ckpt_file = "checkpoints/byol_lightning_20251104_104808/last.ckpt"
-    # ckpt_file = "checkpoints/byol_lightning_20251030_164712/epoch_epoch=49-step=3088-val_loss=0.0524.ckpt"
-    config_file = None
+    ckpt_file = "checkpoints/hybrid2_lit_20260125_092737/last.ckpt"
 
     parser = argparse.ArgumentParser(description='Path of the configuration file.')
     parser.add_argument('--ckpt', default=ckpt_file, type=str)
-    parser.add_argument('--config', default=config_file, type=str)
+    parser.add_argument('--config', default=None, type=str)
     args = parser.parse_args()
 
     if args.config is None:
-        args.config = get_ckpt_config_file(args.ckpt)
+        args.config = config.get_ckpt_config_file(args.ckpt)
 
     print(f"Running inference with checkpoint: {args.ckpt} and config: {args.config}")
-
+    
     config_updates = {
         "dataset": {
-            "root": "Z:/marvel/marvel-fhnw/data/Poleno/",
-            "labels_train": "data/processed/poleno/labels_train.csv",
-            "labels_val": "data/processed/poleno/labels_val.csv",
-            "labels_test": "data/processed/poleno/labels_test.csv",
+            "root": "Z:/marvel/marvel-fhnw/data/",
+            "labels_test": "data/final/poleno/basic_test_20.csv",
         }
     }
 
-    inference(args.ckpt, args.config, config_updates=config_updates)
+    conf = config.load(args.config)
+    conf = config.deep_update(conf, config_updates)
+
+    inference(args.ckpt, conf)

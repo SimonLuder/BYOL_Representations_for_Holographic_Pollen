@@ -15,8 +15,8 @@ class SelfSupervisedLearner(nn.Module):
     def __init__(
         self,
         net,
-        objective,
         image_size,
+        objective=None,
         image_channels = 3,
         hidden_layer = -2,
         projection_size = 256,
@@ -148,6 +148,9 @@ class SelfSupervisedLearner(nn.Module):
             target_proj, _ = target_encoder(images) # Backbone + Projector
             target_proj = target_proj.detach()
             target_proj_1, target_proj_2 = target_proj.chunk(2, dim=0)
+
+        if self.objective is None:
+            return
 
         # Loss objective
         if self.use_prediction_head:

@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-from byol_poleno.model import SelfSupervisedLearner
+from ssl_poleno.model import SelfSupervisedLearner
 
 
 class LITSSLModel(pl.LightningModule):
