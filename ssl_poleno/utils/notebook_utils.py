@@ -49,7 +49,7 @@ def interactive_pca_3d_highlight(df, highlight_column="species", width=800, heig
             else:
                 new_markers.append(dict(color="lightgray", 
                                         size=marker_size, 
-                                        opacity=0.5))
+                                        opacity=0.3))
         buttons.append(dict(
             label=f"{sp}",
             method="update",

@@ -10,10 +10,10 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from byol_poleno.utils import config
-from byol_poleno.utils.wandb_utils import WandbManager
-from byol_poleno.model import BYOLWithTwoImages
-from byol_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
+from ssl_poleno.utils import config
+from ssl_poleno.utils.wandb_utils import WandbManager
+from ssl_poleno.model import BYOLWithTwoImages
+from ssl_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
 
 
 def set_bn_eval(m):

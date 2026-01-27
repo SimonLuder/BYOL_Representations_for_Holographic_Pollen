@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from pollen_datasets.poleno import PairwiseHolographyImageFolder
-from byol_poleno.utils import config
+from ssl_poleno.utils import config
 
 
 # DINOv2 image encoder wrapper

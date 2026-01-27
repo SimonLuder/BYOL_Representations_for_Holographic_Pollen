@@ -12,10 +12,10 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.strategies import DDPStrategy
 
-from byol_poleno.utils import config
-from byol_poleno.model.lightning import LITSSLModel
-from byol_poleno.model.objectives import NormalizedL2Objective, VICRegObjective, HybridObjective, Hybrid2Objective
-from byol_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
+from ssl_poleno.utils import config
+from ssl_poleno.model.lightning import LITSSLModel
+from ssl_poleno.model.objectives import NormalizedL2Objective, VICRegObjective, HybridObjective, Hybrid2Objective
+from ssl_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
         
 
 def main(config_path):

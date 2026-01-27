@@ -10,7 +10,7 @@ from torchvision import transforms
 import clip
 
 from pollen_datasets.poleno import PairwiseHolographyImageFolder
-from byol_poleno.utils import config
+from ssl_poleno.utils import config
 
 
 # CLIP image encoder wrapper (official repo)
