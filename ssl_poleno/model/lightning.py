@@ -126,7 +126,7 @@ class LITSSLModel(pl.LightningModule):
 
                 if self.trainer.is_global_zero:
                     knn_acc = self.knn_accuracy(emb, lbl, k=10)
-                    self.log("val_knn_acc_epoch", knn_acc, on_epoch=True)
+                    self.log("val_cls_knn_acc_epoch", knn_acc, on_epoch=True)
 
             # Event
             if self.val_knn_labels_event:

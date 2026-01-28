@@ -72,27 +72,39 @@ def main(config_path):
                 [0.5,] * img_channels,
             )
         )
-        if transform_conf.get("gaussian_blur"):
+
+        gaussian_blur = transform_conf.get("gaussian_blur", {"enabled": False})
+        if gaussian_blur.get("enabled", False):
             print("Using GaussianBlur augmentation")
             transforms_list.append(
                 transforms.RandomApply(
-                    [transforms.GaussianBlur((3, 3), (1.0, 2.0))],
-                    p=0.2
+                    [transforms.GaussianBlur(
+                        gaussian_blur.get("kernel_size", (3, 3)),
+                        gaussian_blur.get("sigma", (1.0, 2.0)),
+                    )],
+                    p=gaussian_blur.get("p", 0.2)
                 )
             )
 
-        if transform_conf.get("random_resized_crop"):
+        rrc = transform_conf.get("random_resized_crop", {"enabled": False})
+        if rrc.get("enabled", False):
             print("Using RandomResizedCrop augmentation")
             transforms_list.append(
-                transforms.RandomResizedCrop(
-                    size=dataset_conf.get("img_interpolation", img_size),
-                    scale=(0.9, 1.0),
-                    ratio=(1.0, 1.0),
+                transforms.RandomApply(
+                    [transforms.RandomResizedCrop(
+                        size=dataset_conf.get("img_interpolation", img_size),
+                        scale=rrc.get("scale", (0.9, 1.0)),
+                        ratio=rrc.get("ratio", (1.0, 1.0)),
+                    )],
+                p=rrc.get("p", 0.5)
                 )
             )
+
         return transforms.Compose(transforms_list)
     
     transform = get_transform(transform_conf, dataset_conf.get("img_size", 1), dataset_conf.get("img_channels", 1))
+
+    print(transform)
 
     # Check if labels fies exist
     if not os.path.isfile(dataset_conf["labels_train"]):
@@ -164,16 +176,9 @@ def main(config_path):
             lambda_var=model_conf.get("lambda_var", 1),
             lambda_cov=model_conf.get("lambda_cov", 0.04))
         use_prediction_head=False
-        
+
     elif objective_name == "hybrid":
         objective = HybridObjective(
-            lambda_inv=model_conf.get("lambda_inv", 1),
-            lambda_var=model_conf.get("lambda_var", 1),
-            lambda_cov=model_conf.get("lambda_cov", 0.04))
-        use_prediction_head=False
-
-    elif objective_name == "hybrid2":
-        objective = Hybrid2Objective(
             lambda_inv=model_conf.get("lambda_inv", 1),
             lambda_var=model_conf.get("lambda_var", 1),
             lambda_cov=model_conf.get("lambda_cov", 0.04))
@@ -215,8 +220,8 @@ def main(config_path):
 
     knn_checkpoint_callback = pl.callbacks.ModelCheckpoint(
         dirpath=checkpoint_dir,
-        filename="best_knn_{epoch}-{step}-{val_knn_acc_epoch:.4f}",
-        monitor="val_knn_acc_epoch",
+        filename="best_knn_{epoch}-{step}-{val_cls_knn_acc_epoch:.4f}",
+        monitor="val_cls_knn_acc_epoch",
         mode="max",                 
         save_top_k=1,
         save_last=False,
@@ -243,7 +248,7 @@ def main(config_path):
     "global_batch_size": global_batch_size
     })
 
-    print(f"✅ Global batch size: {global_batch_size}")
+    print(f"Global batch size: {global_batch_size}")
     print("Num_devices:", torch.cuda.device_count())
 
     if torch.cuda.device_count() > 1:

@@ -16,8 +16,18 @@ dataset : # Dataset configuration
 transforms:
   name: base_transform
   img_interpolation : 224                                         # size after interpolation or "Null"
-  gaussian_blur : False                                           # whether to apply gaussian blur
-  random_resized_crop : False                                     # whether to apply random resized crop
+
+  gaussian_blur:                                                  # whether to apply gaussian blur               
+    enabled: True
+    kernel_size: [3, 3]
+    sigma: [0.1, 2.0]
+    p: 0.2
+
+  random_resized_crop:                                            # whether to apply random resized crop
+    enabled: True                                                                   
+    scale: [0.8, 1.0]
+    ratio: [1.0, 1.0]
+    p: 1.0
 
 training :
   lr : 0.0005
@@ -30,17 +40,17 @@ training :
 
 ssl:
   backbone : "resnet50"                                 # backbone architecture
-  objective: "byol"                                     # byol, simsiam or vicreg
-  pretrained : True                                    # load backbone pretrained if True
+  objective: "byol"                                     # byol, simsiam, vicreg or hybrid
+  pretrained : True                                     # load backbone pretrained if True
   hidden_layer : "avgpool"                              # layer from which to extract embedding features in backbone
   embedding_size : Null                                 # size of the embedding output
   projection_size : 256                                 # size of the projection output
   projection_hidden_size : 4096                         # size of the hidden layer in the projection MLP
   moving_average_decay : 0.99                           # exponential moving average decay for target network
   use_momentum : True                                   # whether to use momentum encoder
-  use_vicreg: False
-  lambda_var : 1
-  lambda_cov : 0.04
+  lambda_inv : 1                                        # (VICReg) Invariance loss strength
+  lambda_var : 1                                        # (VICReg) Variance loss strength
+  lambda_cov : 0.04                                     # (VICReg) Covariance loss strength
   val_knn : True
   
 conditioning: # For knn validation only
