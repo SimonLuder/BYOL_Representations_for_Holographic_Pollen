@@ -14,7 +14,7 @@ from pytorch_lightning.strategies import DDPStrategy
 
 from ssl_poleno.utils import config
 from ssl_poleno.model.lightning import LITSSLModel
-from ssl_poleno.model.objectives import NormalizedL2Objective, VICRegObjective, HybridObjective, Hybrid2Objective
+from ssl_poleno.model.objectives import NormalizedL2Objective, VICRegObjective, HybridObjective
 from ssl_poleno.model.backbones import get_backbone, set_single_channel_input, update_linear_layer
         
 
@@ -195,7 +195,7 @@ def main(config_path):
     else: 
         raise ValueError(
         f'Invalid objective "{objective_name}". '
-        'Choose from ["byol", "simsiam", "vicreg", "hybrid", "hybrid2"].'
+        'Choose from ["byol", "simsiam", "vicreg", "hybrid"].'
         )
 
     # Lightning model
