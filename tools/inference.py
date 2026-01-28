@@ -102,7 +102,8 @@ def inference(ckpt_path, conf, save_as="inference.npz"):
             out_features=model_conf["embedding_size"]
         )
 
-    use_prediction_head = False if model_conf.get("objective", None) in ["vicreg", "hybrid", "hybrid2"] else True
+    use_prediction_head = True if str(model_conf.get("objective", None)).lower() in ["byol", "simsiam"] else False
+    use_momentum = True if str(model_conf.get("objective", None)).lower() == "byol" else False
 
     # Recreate BYOL model
     model = SelfSupervisedLearner(
@@ -115,7 +116,7 @@ def inference(ckpt_path, conf, save_as="inference.npz"):
         augment_fn=torch.nn.Identity(),
         augment_fn2=torch.nn.Identity(),
         moving_average_decay=model_conf.get("moving_average_decay", 0.99),
-        use_momentum=model_conf.get("use_momentum", True),
+        use_momentum=use_momentum,
         use_prediction_head=use_prediction_head,
     )
 

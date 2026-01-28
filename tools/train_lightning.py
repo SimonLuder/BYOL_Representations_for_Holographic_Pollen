@@ -166,9 +166,15 @@ def main(config_path):
     # Objective
     objective_name = str(model_conf["objective"]).lower()
 
-    if objective_name in ["byol", "simsiam"]:
+    if objective_name == "byol":
         objective = NormalizedL2Objective()
         use_prediction_head = True
+        use_momentum = True
+
+    elif objective_name == "simsiam":
+        objective = NormalizedL2Objective()
+        use_prediction_head = True
+        use_momentum = False
 
     elif objective_name == "vicreg":
         objective = VICRegObjective(
@@ -176,6 +182,7 @@ def main(config_path):
             lambda_var=model_conf.get("lambda_var", 1),
             lambda_cov=model_conf.get("lambda_cov", 0.04))
         use_prediction_head=False
+        use_momentum = False
 
     elif objective_name == "hybrid":
         objective = HybridObjective(
@@ -183,6 +190,7 @@ def main(config_path):
             lambda_var=model_conf.get("lambda_var", 1),
             lambda_cov=model_conf.get("lambda_cov", 0.04))
         use_prediction_head=False
+        use_momentum = False
         
     else: 
         raise ValueError(
@@ -202,7 +210,7 @@ def main(config_path):
         augment_fn=torch.nn.Identity(), # TODO Update for single image training
         augment_fn2=None,
         moving_average_decay=model_conf.get("moving_average_decay", 0.99),
-        use_momentum=model_conf.get("use_momentum", True),
+        use_momentum=use_momentum,
         lr=train_conf["lr"],
         val_knn=model_conf.get("val_knn", False),
         use_prediction_head=use_prediction_head,

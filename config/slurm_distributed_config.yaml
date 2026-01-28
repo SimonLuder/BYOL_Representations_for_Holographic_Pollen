@@ -39,14 +39,13 @@ training :
 
 ssl:
   backbone : "resnet50"                                 # backbone architecture
-  bjective: "byol"                                      # byol, simsiam or vicreg
+  obective: "byol"                                      # byol, simsiam or vicreg
   pretrained : True                                     # load backbone pretrained if True
   hidden_layer : "avgpool"                              # layer from which to extract embedding features in backbone
   embedding_size : Null                                 # size of the embedding output
   projection_size : 256                                 # size of the projection output
   projection_hidden_size : 4096                         # size of the hidden layer in the projection MLP
-  moving_average_decay : 0.99                           # exponential moving average decay for target network
-  use_momentum : True                                   # whether to use momentum encoder
+  moving_average_decay : 0.99                           # exponential moving average decay for target network (only for BYOL)
   lambda_inv : 1                                        # (VICReg) Invariance loss strength
   lambda_var : 1                                        # (VICReg) Variance loss strength
   lambda_cov : 0.04                                     # (VICReg) Covariance loss strength
