@@ -39,7 +39,7 @@ training :
 
 ssl:
   backbone : "resnet50"                                 # backbone architecture
-  obective: "byol"                                      # byol, simsiam or vicreg
+  objective: "byol"                                     # byol, simsiam, vicreg or hybrid
   pretrained : True                                     # load backbone pretrained if True
   hidden_layer : "avgpool"                              # layer from which to extract embedding features in backbone
   embedding_size : Null                                 # size of the embedding output
