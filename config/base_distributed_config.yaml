@@ -29,6 +29,12 @@ transforms:
     ratio: [1.0, 1.0]
     p: 1.0
 
+  color_jitter:                                                   # whether to apply random color jitter
+    enabled: True                                                                   
+    brightness: 0.4
+    contrast: 0.4
+    p: 0.4
+
 training :
   lr : 0.0005
   batch_size : 8

@@ -79,7 +79,7 @@ def main(config_path):
             transforms_list.append(
                 transforms.RandomApply(
                     [transforms.GaussianBlur(
-                        gaussian_blur.get("kernel_size", (3, 3)),
+                        gaussian_blur.get("kernel_size", (23, 23)),
                         gaussian_blur.get("sigma", (1.0, 2.0)),
                     )],
                     p=gaussian_blur.get("p", 0.2)
@@ -99,6 +99,20 @@ def main(config_path):
                 p=rrc.get("p", 0.5)
                 )
             )
+
+        jitter = transform_conf.get("color_jitter", {"enabled": False})
+        if jitter.get("enabled", False):
+            print("Using ColorJitter augmentation")
+            transforms_list.append(
+                transforms.RandomApply(
+                    [transforms.ColorJitter(
+                        brightness=jitter.get("brightness", 0.4), 
+                        contrast=jitter.get("contrast", 0.4)
+                    )],
+                p=jitter.get("p", 0.4)
+                )
+            )
+        
 
         return transforms.Compose(transforms_list)
     

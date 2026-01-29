@@ -19,7 +19,7 @@ transforms:
 
   gaussian_blur:                                                  # whether to apply gaussian blur               
     enabled: True
-    kernel_size: [3, 3]
+    kernel_size: [23, 23]
     sigma: [0.1, 2.0]
     p: 0.2
 
@@ -27,6 +27,13 @@ transforms:
     enabled: True                                                                   
     scale: [0.8, 1.0]
     ratio: [1.0, 1.0]
+    p: 1.0
+
+  color_jitter:                                                 # whether to apply random color jitter
+    enabled: True                                                                   
+    brightness: 0.4
+    contrast: 0.4
+    p: 0.4
 
 training :
   lr : 0.0005
