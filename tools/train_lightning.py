@@ -116,7 +116,32 @@ def main(config_path):
 
         return transforms.Compose(transforms_list)
     
+
+    def get_val_transform(transform_conf, img_channels):
+        
+        # Transformations
+        transforms_list = [transforms.ToTensor()]
+
+        if transform_conf.get("img_interpolation"):
+            print("Using image interpolation:", transform_conf["img_interpolation"])
+            transforms_list.append(
+                transforms.Resize(
+                    (transform_conf["img_interpolation"], 
+                     transform_conf["img_interpolation"]),
+                    interpolation=transforms.InterpolationMode.BILINEAR,
+                )
+            )
+        transforms_list.append(
+            transforms.Normalize(
+                [0.5,] * img_channels,
+                [0.5,] * img_channels,
+            )
+        )
+
+        return transforms.Compose(transforms_list)
+    
     transform = get_transform(transform_conf, dataset_conf.get("img_size", 1), dataset_conf.get("img_channels", 1))
+    val_transform = get_val_transform(transform_conf, dataset_conf.get("img_channels", 1))
 
     print(transform)
 
@@ -141,7 +166,7 @@ def main(config_path):
     if dataset_conf.get("labels_val"):
         dataset_val = dataset(
             root=dataset_conf["root"],
-            transform=transform,
+            transform=val_transform,
             dataset_cfg=dataset_conf,
             cond_cfg=cond_conf,
             labels=dataset_conf.get("labels_val"),
