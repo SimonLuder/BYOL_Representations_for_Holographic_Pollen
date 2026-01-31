@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ssl_poleno"
-version = "0.0.1"
+version = "0.0.2"
 description = "Code to train and use a encoder for poleno images with byol."
 readme = "README.md"
 license = { text = "MIT" }
