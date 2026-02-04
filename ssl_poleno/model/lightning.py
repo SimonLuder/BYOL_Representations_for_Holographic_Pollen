@@ -128,6 +128,9 @@ class LITSSLModel(pl.LightningModule):
                     knn_acc = self.knn_accuracy(emb, lbl, k=10)
                     self.log("val_cls_knn_acc_epoch", knn_acc, on_epoch=True)
 
+                    knn_l2_acc = self.knn_l2_accuracy(emb, lbl, k=10)
+                    self.log("val_cls_l2_knn_acc_epoch", knn_l2_acc, on_epoch=True)
+
             # Event
             if self.val_knn_labels_event:
                 lble = torch.cat(self.val_knn_labels_event, dim=0).to(self.device)  # Local labels: (N,)
@@ -205,6 +208,18 @@ class LITSSLModel(pl.LightningModule):
         sim.fill_diagonal_(-float("inf"))
 
         topk = sim.topk(k=k, dim=1).indices
+        preds, _ = torch.mode(labels[topk], dim=1)
+
+        return (preds == labels).float().mean()
+     
+     
+    @staticmethod
+    @torch.no_grad()
+    def knn_l2_accuracy(emb, labels, k=10):
+        dist = torch.cdist(emb, emb)
+        dist.fill_diagonal_(float("inf"))
+
+        topk = dist.topk(k=k, largest=False).indices
         preds, _ = torch.mode(labels[topk], dim=1)
 
         return (preds == labels).float().mean()
