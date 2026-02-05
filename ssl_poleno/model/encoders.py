@@ -14,7 +14,10 @@ class BYOLPolenoEmbedding(nn.Module):
         # 1. Build backbone architecture
         net = backbones.get_backbone(backbone, pretrained=False)
         net = backbones.set_single_channel_input(net)
-        net = backbones.update_linear_layer(net, layer=emb_layer, out_features=out_dim)
+
+        layer = backbones.find_layer(net, emb_layer)
+        if isinstance(layer, nn.Linear):
+            net = backbones.update_linear_layer(net, layer=emb_layer, out_features=out_dim)
 
         # 2. Load BYOL-trained weights
         net = backbones.load_byol_backbone_weights_from_checkpoint(ckpt_path, net)
