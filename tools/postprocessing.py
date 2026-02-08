@@ -69,23 +69,53 @@ if __name__ == "__main__":
         "byol_lit_20260204_152517",
     ]
 
-    config_updates = {
-    "dataset": {
-        "root": "Z:/marvel/marvel-fhnw/data/",
-        "labels_test": "data/final/poleno/isolated_test_20.csv",
-        }
-    }   
-
     parser = argparse.ArgumentParser(description='Arguments for postprocessing')
-    parser.add_argument('--localpath', dest='localpath', default='checkpoints/', type=str)
-    parser.add_argument('--names', dest='ckpt_names', nargs='+', default=None, 
-                        type=str, help='List of checkpoint / model names')
+
+    parser.add_argument(
+        '--localpath', 
+        dest='localpath', 
+        default='checkpoints/', 
+        type=str
+    )
+
+    parser.add_argument(
+        '--ckpts', 
+        dest='ckpt_names', 
+        nargs='+', 
+        default=None, 
+        type=str, 
+        help='List of checkpoint / model names'
+    )
+    
+    parser.add_argument(
+        '--labels', 
+        dest='labels', 
+        nargs='+', 
+        default=[], 
+        type=str, 
+        help='List of test labels'
+    )
+    
     args = parser.parse_args()
 
     if args.ckpt_names is not None:
         checkpoint_names = args.ckpt_names
 
-    run_pipeline(checkpoint_names, 
-                 localpath=args.localpath, 
-                 config_updates=config_updates, 
-                 force_run=False)
+    if not args.labels:
+        raise ValueError("At least one --labels entry must be provided.")
+
+    for label in args.labels:
+
+        config_updates = {
+        "dataset": {
+            "root": "Z:/marvel/marvel-fhnw/data/",
+            "labels_test": label,
+            }
+        }   
+
+        run_pipeline(
+            checkpoint_names, 
+            localpath=args.localpath, 
+            config_updates=config_updates, 
+            force_run=False
+        )
