@@ -104,7 +104,33 @@ def get_best_checkpoint_by_val_knn_acc(ckpt_dir):
     best_ckpt = None
     best_acc = float("-inf")
 
-    pattern = re.compile(r"val_knn_acc_epoch=([0-9]*\.?[0-9]+)")
+    pattern = re.compile(r"best_knn_epoch=([0-9]*\.?[0-9]+)")
+
+    for fname in os.listdir(ckpt_dir):
+        if not fname.endswith(".ckpt"):
+            continue
+
+        match = pattern.search(fname)
+        if match is None:
+            continue
+
+        acc = float(match.group(1))
+        if acc > best_acc:
+            best_acc = acc
+            best_ckpt = fname
+
+    return best_ckpt
+
+
+def get_best_checkpoint_by_mrr(ckpt_dir):
+    """
+    Returns the filename of the checkpoint with the highest val_knn_acc_epoch.
+    Ignores files without 'val_knn_acc_epoch=' in the name.
+    """
+    best_ckpt = None
+    best_acc = float("-inf")
+
+    pattern = re.compile(r"best_mrr_epoch=([0-9]*\.?[0-9]+)")
 
     for fname in os.listdir(ckpt_dir):
         if not fname.endswith(".ckpt"):

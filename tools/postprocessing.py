@@ -5,13 +5,14 @@ from ssl_poleno.utils import pipeline
 from ssl_poleno.utils import config
 
 
-def run_pipeline(force_run=False, localpath="checkpoints/", config_updates=None):
+def run_pipeline(checkpoint_names, force_run=False, localpath="checkpoints/", config_updates=None):
 
     for model in checkpoint_names:
 
         ckpt_folder = os.path.join(localpath, model)
         best_ckpt = pipeline.get_best_checkpoint_by_val_loss(ckpt_folder)
         best_knn_ckpt = pipeline.get_best_checkpoint_by_val_knn_acc(ckpt_folder)
+        best_mrr_ckpt = pipeline.get_best_checkpoint_by_mrr(ckpt_folder)
 
         all_inference_ckpts = {
             "best": os.path.join(localpath, model, best_ckpt),
@@ -20,6 +21,9 @@ def run_pipeline(force_run=False, localpath="checkpoints/", config_updates=None)
 
         if best_knn_ckpt is not None:
             all_inference_ckpts["knn"] = os.path.join(localpath, model, best_knn_ckpt)
+
+        if best_mrr_ckpt is not None:
+            all_inference_ckpts["mrr"] = os.path.join(localpath, model, best_mrr_ckpt)
 
         for ckpt_name, ckpt_path in all_inference_ckpts.items():
 
@@ -62,20 +66,26 @@ def run_pipeline(force_run=False, localpath="checkpoints/", config_updates=None)
 if __name__ == "__main__":
 
     checkpoint_names = [
-        "byol_lightning_20260116_163206",
+        "byol_lit_20260204_152517",
     ]
 
     config_updates = {
     "dataset": {
         "root": "Z:/marvel/marvel-fhnw/data/",
-        "labels_test": "data/final/poleno/basic_test_20.csv",
+        "labels_test": "data/final/poleno/isolated_test_20.csv",
         }
     }   
 
     parser = argparse.ArgumentParser(description='Arguments for postprocessing')
-    parser.add_argument('--checkpoints', dest='path', default='checkpoints/', type=str)
+    parser.add_argument('--localpath', dest='localpath', default='checkpoints/', type=str)
+    parser.add_argument('--names', dest='ckpt_names', nargs='+', default=None, 
+                        type=str, help='List of checkpoint / model names')
     args = parser.parse_args()
 
-    args.path = r"Z:\simon_luder\BYOL\BYOL_Representations_for_Holographic_Pollen\checkpoints"
+    if args.ckpt_names is not None:
+        checkpoint_names = args.ckpt_names
 
-    run_pipeline(force_run=False, localpath=args.path, config_updates=config_updates)
+    run_pipeline(checkpoint_names, 
+                 localpath=args.localpath, 
+                 config_updates=config_updates, 
+                 force_run=False)

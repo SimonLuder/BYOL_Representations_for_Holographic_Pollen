@@ -1,4 +1,5 @@
 import os
+import re
 import yaml
 
 
@@ -27,14 +28,21 @@ def get_ckpt_config_file(ckpt_path):
     """Get config path from checkpoint folder"""
     if os.path.isfile(ckpt_path):
         ckpt_path = os.path.dirname(ckpt_path)
-        
+
+    config_path = None
+    pattern = re.compile(r".*config.*\.ya?ml$")
+
     for file in os.listdir(ckpt_path):
-        if file.endswith("config.yaml"):
+        if pattern.match(file):
             config_path = os.path.join(ckpt_path, file)
             print(f"[INFO] Using config file: {config_path}")
             break
-        else:
-            print(f"[WARNING] No config file found in {ckpt_path}.")
+
+    if config_path is None:
+        raise FileNotFoundError(
+            f"No *config*.ya?ml file found in checkpoint directory: {ckpt_path}"
+        )
+
     return config_path
 
 
