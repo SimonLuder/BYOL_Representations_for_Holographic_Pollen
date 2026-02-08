@@ -79,6 +79,13 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--data_root",
+        type=str,
+        default='Z:/marvel/marvel-fhnw/data/',
+        help="Dataset root inside the container",
+        )
+
+    parser.add_argument(
         '--ckpts', 
         dest='ckpt_names', 
         nargs='+', 
@@ -108,7 +115,7 @@ if __name__ == "__main__":
 
         config_updates = {
         "dataset": {
-            "root": "Z:/marvel/marvel-fhnw/data/",
+            "root": args.data_root,
             "labels_test": label,
             }
         }   
