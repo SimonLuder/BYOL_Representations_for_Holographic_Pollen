@@ -140,8 +140,6 @@ if __name__ == "__main__":
     
     parser.add_argument(
         '--labels', 
-        dest='labels', 
-        nargs='+', 
         default=None, 
         type=str, 
         help='List of test labels'
