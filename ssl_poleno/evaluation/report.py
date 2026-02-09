@@ -1,6 +1,6 @@
 import os
-
 import pandas as pd
+from pathlib import Path
 
 
 class EvaluationSummary:
@@ -37,6 +37,7 @@ class EvaluationSummary:
 
     def save(self):
         """Persist the evaluation summary to disk."""
+        Path(self.summary_file).parent.mkdir(parents=True, exist_ok=True)
         self.eval_df.to_csv(self.summary_file, index=False)
 
     def __repr__(self):
