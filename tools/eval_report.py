@@ -119,7 +119,6 @@ def run_tests(checkpoints, labels, ckpt_root="checkpoints", k_fold = 5, k_neighb
         
 if __name__ == "__main__":
 
-    labels = r"Z:\simon_luder\Data_Setup\Pollen_Datasets\data\final\poleno\combined_test_20.csv"
     
     parser = argparse.ArgumentParser(description='Arguments for postprocessing')
 
@@ -140,7 +139,8 @@ if __name__ == "__main__":
     
     parser.add_argument(
         '--labels', 
-        default=None, 
+        default=[], 
+        nargs='+', 
         type=str, 
         help='List of test labels'
     )
@@ -148,6 +148,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     summary = EvaluationSummary(args.outfile, overwrite=True)
+
+    labels = [
+        "Z:/simon_luder/Data_Setup/Pollen_Datasets/data/final/poleno/isolated_test_20.csv",
+        "Z:/simon_luder/Data_Setup/Pollen_Datasets/data/final/poleno/basic_test_20.csv",
+    ]
     
     checkpoint_names = [
         "byol_lit_20260129_235610",
@@ -161,6 +166,7 @@ if __name__ == "__main__":
         "dinov2_vision",
     ]
 
+
     if args.ckpt_names is not None:
         checkpoint_names = args.ckpt_names
 
@@ -169,10 +175,15 @@ if __name__ == "__main__":
     if args.labels is not None:
         labels = args.labels
 
-    results = run_tests(checkpoints, labels)
+    eval_idx = 0
+    for label_file in labels:
+        results = run_tests(checkpoints, label_file)
 
-    for i, new_eval in enumerate(results):
-        summary.add_evaluation(new_eval, checkpoint_key=i)
-        summary.save()
-
+        for new_eval in results:
+            new_eval["labels_file"] = label_file 
+            summary.add_evaluation(new_eval, checkpoint_key=eval_idx)
+            eval_idx += 1
+    
+    summary.save()
     print(summary)
+
