@@ -119,36 +119,6 @@ def run_tests(checkpoints, labels, ckpt_root="checkpoints", k_fold = 5, k_neighb
         
 if __name__ == "__main__":
 
-    
-    parser = argparse.ArgumentParser(description='Arguments for postprocessing')
-
-    parser.add_argument(
-        '--outfile',  
-        default="evaluation_summary.csv", 
-        type=str,
-    )
-
-    parser.add_argument(
-        '--ckpts', 
-        dest='ckpt_names', 
-        nargs='+', 
-        default=None, 
-        type=str, 
-        help='List of checkpoint / model names'
-    )
-    
-    parser.add_argument(
-        '--labels', 
-        default=[], 
-        nargs='+', 
-        type=str, 
-        help='List of test labels'
-    )
-    
-    args = parser.parse_args()
-
-    summary = EvaluationSummary(args.outfile, overwrite=True)
-
     labels = [
         "Z:/simon_luder/Data_Setup/Pollen_Datasets/data/final/poleno/isolated_test_20.csv",
         "Z:/simon_luder/Data_Setup/Pollen_Datasets/data/final/poleno/basic_test_20.csv",
@@ -165,18 +135,40 @@ if __name__ == "__main__":
         "clip_vision",
         "dinov2_vision",
     ]
+    
+    parser = argparse.ArgumentParser(description='Arguments for postprocessing')
 
+    parser.add_argument(
+        '--outfile',  
+        default="evaluation_summary_abl.csv", 
+        type=str,
+    )
 
-    if args.ckpt_names is not None:
-        checkpoint_names = args.ckpt_names
+    parser.add_argument(
+        '--ckpts', 
+        dest='ckpt_names', 
+        nargs='+', 
+        default=checkpoint_names, 
+        type=str, 
+        help='List of checkpoint / model names'
+    )
+    
+    parser.add_argument(
+        '--labels', 
+        default=labels, 
+        nargs='+', 
+        type=str, 
+        help='List of test labels'
+    )
+    
+    args = parser.parse_args()
 
-    checkpoints = checkpoint_names + baselines
+    summary = EvaluationSummary(args.outfile, overwrite=True)
 
-    if args.labels is not None:
-        labels = args.labels
+    checkpoints = args.ckpt_names + baselines
 
     eval_idx = 0
-    for label_file in labels:
+    for label_file in args.labels:
         results = run_tests(checkpoints, label_file)
 
         for new_eval in results:
