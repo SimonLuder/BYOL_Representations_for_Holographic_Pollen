@@ -5,6 +5,7 @@ from typing import List, Tuple
 
 from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import normalize
+from sklearn.metrics import balanced_accuracy_score
 from sklearn.metrics.pairwise import cosine_similarity
 
 
@@ -132,7 +133,7 @@ def evaluate_embeddings_knn_cv(
             k,
         )
 
-        acc = np.mean(preds == y_test)
+        acc = balanced_accuracy_score(y_test, preds)
 
         fold_predictions.append(preds)
         fold_true_labels.append(y_test)
