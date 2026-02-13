@@ -7,8 +7,10 @@ from ssl_poleno.model import SelfSupervisedLearner
 
 class LITSSLModel(pl.LightningModule):
     def __init__(self, backbone, objective, image_size, image_channels, hidden_layer="avgpool", projection_size=256, projection_hidden_size=4096, 
-                 augment_fn=torch.nn.Identity(), augment_fn2=None, moving_average_decay=0.99, use_momentum=True, use_prediction_head=True, lr=3e-4, val_knn=False,
+                 augment_fn=torch.nn.Identity(), augment_fn2=None, moving_average_decay=0.99, use_momentum=True, use_prediction_head=True, lr=3e-4, 
+                 optimizer_class=torch.optim.Adam, optimizer_kwargs=None, val_knn=False,
                  ):
+        
         super().__init__()
         self.model = SelfSupervisedLearner(
             backbone,
@@ -26,6 +28,9 @@ class LITSSLModel(pl.LightningModule):
             sync_batchnorm=True if torch.cuda.device_count() > 1 else False,
         )
         self.lr = lr
+        self.optimizer_class = optimizer_class
+        self.optimizer_kwargs = optimizer_kwargs or {}
+        
         self.best_val_loss = float("inf")
         self.val_embeddings = []
         self.val_knn = val_knn
@@ -162,8 +167,12 @@ class LITSSLModel(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.lr)
-    
+        return self.optimizer_class(
+            self.parameters(),
+            lr=self.lr,
+            **self.optimizer_kwargs
+        )
+
 
     def on_before_zero_grad(self, _):
         if self.model.use_momentum:

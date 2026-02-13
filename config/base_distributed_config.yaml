@@ -43,6 +43,8 @@ training :
   num_nodes : 1
   num_devices : 1
   accumulate_grad_batches : 4
+  optimizer: "adam"
+  optimizer_kwargs: Null
 
 ssl:
   backbone : "resnet50"                                 # backbone architecture

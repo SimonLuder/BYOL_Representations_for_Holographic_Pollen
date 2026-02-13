@@ -236,6 +236,22 @@ def main(config_path):
         f'Invalid objective "{objective_name}". '
         'Choose from ["byol", "simsiam", "vicreg", "hybrid"].'
         )
+    
+    # Optimizer
+    optim_name = train_conf.get("optimizer", "adam")
+    optim_kwargs = train_conf.get("optimizer_kwargs", None)
+
+    if optim_name.lower() == "adam":
+        optim_class = torch.optim.Adam
+
+    elif optim_name.lower() == "sgd":
+        optim_class = torch.optim.SGD
+    
+    else: 
+        raise ValueError(
+        f'Invalid optimizer "{optim_name}". '
+        'Choose from ["sgd", "adam"].'
+        )
 
     # Lightning model
     model = LITSSLModel(
@@ -251,6 +267,8 @@ def main(config_path):
         moving_average_decay=model_conf.get("moving_average_decay", 0.99),
         use_momentum=use_momentum,
         lr=train_conf["lr"],
+        optimizer_class=optim_class,
+        optimizer_kwargs=optim_kwargs,
         val_knn=model_conf.get("val_knn", False),
         use_prediction_head=use_prediction_head,
     )
