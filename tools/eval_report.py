@@ -11,6 +11,7 @@ from collections import Counter
 from typing import List, Tuple, Union
 import scipy.stats as stats
 from ssl_poleno.evaluation.report import EvaluationSummary
+from ssl_poleno.evaluation.mrr import mean_reciprocal_rank
 
 from ssl_poleno.evaluation import knn
 
@@ -71,6 +72,12 @@ def find_files_by_regex(root_dir: Union[str, Path], pattern: str) -> List[Path]:
     return matches
 
 
+def calc_mrr_pd(df, emb_col="emb", lbl_col="event_id"):
+    emb = np.vstack(df[emb_col].values)
+    labels = df[lbl_col].values
+    return mean_reciprocal_rank(emb, labels, reduction="mean")
+
+
 def run_tests(checkpoints, labels, ckpt_root="checkpoints", k_fold = 5, k_neighbors=10):
 
     # Load ground truth labels
@@ -98,6 +105,8 @@ def run_tests(checkpoints, labels, ckpt_root="checkpoints", k_fold = 5, k_neighb
             mean_acc, ci = calc_cv_accuracy_ci(np.array(accuracies))
             acc_se, acc_sd = calc_sd_se(np.array(accuracies))
 
+            event_mrr = calc_mrr_pd(df, emb_col="emb", lbl_col="event_id")
+
             version = os.path.basename(os.path.dirname(filename))
 
             result = {
@@ -111,6 +120,7 @@ def run_tests(checkpoints, labels, ckpt_root="checkpoints", k_fold = 5, k_neighb
                 "cv_accuracy_se": acc_se,
                 "k_fold": k_fold,
                 "k_neighbours": k_neighbors,
+                "event_mrr": event_mrr,
             }
             results.append(result)
 
@@ -120,8 +130,7 @@ def run_tests(checkpoints, labels, ckpt_root="checkpoints", k_fold = 5, k_neighb
 if __name__ == "__main__":
 
     labels = [
-        "Z:/simon_luder/Data_Setup/Pollen_Datasets/data/final/poleno/isolated_test_20.csv",
-        "Z:/simon_luder/Data_Setup/Pollen_Datasets/data/final/poleno/basic_test_20.csv",
+        "Z:/simon_luder/Data_Setup/Pollen_Datasets/data/final/poleno/combined_test_20.csv",
     ]
     
     checkpoint_names = [
