@@ -47,6 +47,8 @@ def main(config_path):
     )
     checkpoint_dir = os.path.join("checkpoints", run_name)
 
+    ckpt_path = train_conf.get("resume_from", None)
+
     # Save config file to checkpoint directory
     os.makedirs(checkpoint_dir, exist_ok=True)
     destination = os.path.join(checkpoint_dir, os.path.basename(config_path))
@@ -340,7 +342,7 @@ def main(config_path):
     )
 
     # Fit
-    trainer.fit(model, dataloader_train, dataloader_val)
+    trainer.fit(model, dataloader_train, dataloader_val, ckpt_path=ckpt_path)
 
 
 if __name__ == "__main__":
