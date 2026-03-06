@@ -40,3 +40,19 @@ def mean_reciprocal_rank(emb, labels, reduction="mean"):
         return reciprocal_ranks.mean()
     
     return reciprocal_ranks
+
+
+def calc_mrr_pd(df, emb_col="emb", lbl_col="event_id"):
+    """Calculate mean reciprocal rank (MRR) for a pandas DataFrame with embeddings and labels.
+
+    Args:
+        df (pd.DataFrame): Metrics DataFrame containing embeddings and labels.
+        emb_col (str, optional): Embedding column name. Defaults to "emb".
+        lbl_col (str, optional): Label column name. Defaults to "event_id".
+
+    Returns:
+        Mean reciprocal rank (MRR) value.
+    """
+    emb = np.vstack(df[emb_col].values)
+    labels = df[lbl_col].values
+    return mean_reciprocal_rank(emb, labels, reduction="mean")

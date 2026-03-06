@@ -72,51 +72,98 @@ def find_files_by_regex(root_dir: Union[str, Path], pattern: str) -> List[Path]:
     return matches
 
 
-def run_tests(checkpoints, labels, ckpt_root="checkpoints", k_fold = 5, k_neighbors=10):
 
-    # Load ground truth labels
+
+def split_species_groups(df: pd.DataFrame, col="species_norm", n_groups=5, seed=42):
+    species = df[col].unique()
+
+    rng = np.random.default_rng(seed)
+    rng.shuffle(species)
+
+    return np.array_split(species, n_groups)
+
+
+def run_tests_species_subset(
+        checkpoints,
+        labels,
+        ckpt_root="checkpoints",
+        k_fold=5,
+        k_neighbors=10,
+        n_species_groups=6
+):
+
     test_labels = pd.read_csv(labels)
-
     results = []
+
     for checkpoint in checkpoints:
 
         files = find_files_by_regex(
-            root_dir=os.path.join(ckpt_root, checkpoint), 
+            root_dir=os.path.join(ckpt_root, checkpoint),
             pattern=r"inference_.*\.npz"
         )
 
         for filename in files:
-            print(f"Calculate respresentations for file: {filename}")
-            # filename = f"{ckpt_root}/{checkpoint}/inference/inference_last.npz"
+
+            print(f"Calculate representations for file: {filename}")
+
             representations, labels_name = load_inference_results(filename)
 
             df = pd.merge(representations, test_labels, on="rec_path", how='inner')
             df = df.sort_values(["species", "event_id"]).reset_index(drop=True)
 
-            out = knn.evaluate_embeddings_knn_cv(df, y_col="species", k=k_neighbors, n_splits=k_fold)
-            predictions, true_labels, test_indices, accuracies = out
-
-            mean_acc, ci = calc_cv_accuracy_ci(np.array(accuracies))
-            acc_se, acc_sd = calc_sd_se(np.array(accuracies))
-
-            event_mrr = calc_mrr_pd(df, emb_col="emb", lbl_col="event_id")
+            # create species groups
+            species_groups = split_species_groups(
+                df,
+                col="species_norm",
+                n_groups=n_species_groups
+            )
 
             version = os.path.basename(os.path.dirname(filename))
 
-            result = {
-                "checkpoint": checkpoint,
-                "version": version,
-                "labels": labels_name,
-                "mean_cv_accuracy": mean_acc,
-                "cv_accuracy_ci_low_95": ci[0],
-                "cv_accuracy_ci_high_95": ci[1],
-                "cv_accuracy_sd": acc_sd,
-                "cv_accuracy_se": acc_se,
-                "k_fold": k_fold,
-                "k_neighbours": k_neighbors,
-                "event_mrr": event_mrr,
-            }
-            results.append(result)
+            for group_idx, species_subset in enumerate(species_groups):
+
+                df_subset = df[df["species_norm"].isin(species_subset)].reset_index(drop=True)
+
+                print(
+                    f"Running subset {group_idx+1}/{n_species_groups} "
+                    f"with {len(species_subset)} species and {len(df_subset)} samples"
+                )
+
+                out = knn.evaluate_embeddings_knn_cv(
+                    df_subset,
+                    y_col="species",
+                    k=k_neighbors,
+                    n_splits=k_fold
+                )
+
+                predictions, true_labels, test_indices, accuracies = out
+
+                mean_acc, ci = calc_cv_accuracy_ci(np.array(accuracies))
+                acc_sd, acc_se = calc_sd_se(np.array(accuracies))
+
+                event_mrr = calc_mrr_pd(df_subset, emb_col="emb", lbl_col="event_id")
+
+                result = {
+                    "checkpoint": checkpoint,
+                    "version": version,
+                    "labels": labels_name,
+
+                    "species_group": group_idx,
+                    "species_in_group": len(species_subset),
+                    "samples_in_group": len(df_subset),
+
+                    "mean_cv_accuracy": mean_acc,
+                    "cv_accuracy_ci_low_95": ci[0],
+                    "cv_accuracy_ci_high_95": ci[1],
+                    "cv_accuracy_sd": acc_sd,
+                    "cv_accuracy_se": acc_se,
+
+                    "k_fold": k_fold,
+                    "k_neighbours": k_neighbors,
+                    "event_mrr": event_mrr,
+                }
+
+                results.append(result)
 
     return results
 
@@ -143,7 +190,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         '--outfile',  
-        default="evaluation_summary_abl.csv", 
+        default="evaluation_summary_subsets.csv", 
         type=str,
     )
 
@@ -172,7 +219,7 @@ if __name__ == "__main__":
 
     eval_idx = 0
     for label_file in args.labels:
-        results = run_tests(checkpoints, label_file)
+        results = run_tests_species_subset(checkpoints, label_file)
 
         for new_eval in results:
             new_eval["labels_file"] = label_file 
