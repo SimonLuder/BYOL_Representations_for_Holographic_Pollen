@@ -77,7 +77,7 @@ def run_tests_species_sizes(
         ckpt_root="checkpoints",
         k_fold=5,
         k_neighbors=10,
-        train_sizes=[10, 20, 40, 80],
+        train_sizes=[10, 20, 40, 80, 120, 160],
 ):
 
     test_labels = pd.read_csv(labels)
@@ -85,73 +85,70 @@ def run_tests_species_sizes(
 
     for checkpoint in checkpoints:
 
-        # files = find_files_by_regex(
-        #     root_dir=os.path.join(ckpt_root, checkpoint),
-        #     pattern=r"inference_.*\.npz"
-        # )
+        for embedding in embeddings:
 
-        filename = os.path.join(ckpt_root, checkpoint, embeddings)
+            filename = os.path.join(ckpt_root, checkpoint, embedding)
 
-        print(f"Calculate representations for file: {filename}")
+            print(f"Calculate representations for file: {filename}")
 
-        representations, labels_name = load_inference_results(filename)
+            representations, labels_name = load_inference_results(filename)
 
-        df = pd.merge(representations, test_labels, on="rec_path", how="inner")
-        df = df.sort_values(["species", "event_id"]).reset_index(drop=True)
+            df = pd.merge(representations, test_labels, on="rec_path", how="inner")
+            df = df.sort_values(["species", "event_id"]).reset_index(drop=True)
 
-        version = os.path.basename(os.path.dirname(filename))
+            version = os.path.basename(os.path.dirname(filename))
 
-        n_species = df["species"].nunique()
-        n_samples = len(df)
+            n_species = df["species"].nunique()
+            n_samples = len(df)
 
-        print(f"Dataset contains {n_species} species and {n_samples} samples")
+            print(f"Dataset contains {n_species} species and {n_samples} samples")
 
-        # # compute event retrieval once
-        # event_mrr = calc_mrr_pd(df, emb_col="emb", lbl_col="event_id")
+            # # compute event retrieval once
+            # event_mrr = calc_mrr_pd(df, emb_col="emb", lbl_col="event_id")
 
-        for train_size in train_sizes:
+            for train_size in train_sizes:
 
-            print(
-                f"Running kNN with {train_size} training samples per class"
-            )
+                print(
+                    f"Running kNN with {train_size} training samples per class"
+                )
 
-            out = knn.evaluate_embeddings_knn_cv(
-                df,
-                y_col="species",
-                k=k_neighbors,
-                n_splits=k_fold,
-                train_samples_per_class=train_size
-            )
+                out = knn.evaluate_embeddings_knn_cv(
+                    df,
+                    y_col="species",
+                    k=k_neighbors,
+                    n_splits=k_fold,
+                    train_samples_per_class=train_size
+                )
 
-            predictions, true_labels, test_indices, accuracies = out
+                predictions, true_labels, test_indices, accuracies = out
 
-            accuracies = np.array(accuracies)
+                accuracies = np.array(accuracies)
 
-            mean_acc, ci = calc_cv_accuracy_ci(accuracies)
-            acc_sd, acc_se = calc_sd_se(accuracies)
+                mean_acc, ci = calc_cv_accuracy_ci(accuracies)
+                acc_sd, acc_se = calc_sd_se(accuracies)
 
-            result = {
-                "checkpoint": checkpoint,
-                "version": version,
-                "labels": labels_name,
+                result = {
+                    "checkpoint": checkpoint,
+                    "version": version,
+                    "labels": labels_name,
 
-                "train_samples_per_class": train_size,
+                    "train_samples_per_class": train_size,
 
-                "species_total": n_species,
-                "samples_total": n_samples,
+                    "species_total": n_species,
+                    "samples_total": n_samples,
 
-                "mean_cv_accuracy": mean_acc,
-                "cv_accuracy_ci_low_95": ci[0],
-                "cv_accuracy_ci_high_95": ci[1],
-                "cv_accuracy_sd": acc_sd,
-                "cv_accuracy_se": acc_se,
+                    "mean_cv_accuracy": mean_acc,
+                    "cv_accuracy_ci_low_95": ci[0],
+                    "cv_accuracy_ci_high_95": ci[1],
+                    "cv_accuracy_sd": acc_sd,
+                    "cv_accuracy_se": acc_se,
 
-                "k_fold": k_fold,
-                "k_neighbours": k_neighbors,
+                    "k_fold": k_fold,
+                    "k_neighbours": k_neighbors,
 
-            }
+                }
 
-            results.append(result)
+                results.append(result)
 
     return results
 
@@ -163,10 +160,9 @@ if __name__ == "__main__":
     ]
     
     checkpoint_names = [
-        "byol_lit_20260129_235610",
-        "byol_lit_20260205_131039",
-        "byol_lit_20260202_232449",
-        "byol_lit_20260204_105645",
+        "byol_lit_20260204_152517",
+        "simsiam_lit_20260217_151853",
+        "vicreg_lit_20260206_160405",
     ]
 
     parser = argparse.ArgumentParser(description='Arguments for postprocessing')
@@ -196,9 +192,10 @@ if __name__ == "__main__":
 
     parser.add_argument(
         '--embeddings', 
-        default="inference/knn/inference_basic_test.npz", 
+        default=["inference/knn/inference_basic_test.npz"], 
         type=str, 
-        help='Embeddings file'
+        nargs='+', 
+        help='List of embeddings files'
     )
     
     args = parser.parse_args()
