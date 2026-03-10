@@ -164,11 +164,6 @@ if __name__ == "__main__":
         "simsiam_lit_20260217_151853",
         "vicreg_lit_20260206_160405",
     ]
-
-    baselines = [
-        "clip_vision",
-        "dinov2_vision",
-    ]
     
     parser = argparse.ArgumentParser(description='Arguments for postprocessing')
 
@@ -215,7 +210,7 @@ if __name__ == "__main__":
 
     summary = EvaluationSummary(args.outfile, overwrite=True)
 
-    checkpoints = args.ckpt_names + baselines
+    checkpoints = args.ckpt_names
 
     eval_idx = 0
     for label_file in args.labels:
