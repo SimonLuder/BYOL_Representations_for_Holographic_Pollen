@@ -166,7 +166,7 @@ def run_tests_species_subset(
 if __name__ == "__main__":
 
     labels = [
-        "Z:/simon_luder/Data_Setup/Pollen_Datasets/data/final/poleno/combined_test_20.csv",
+        "Z:/simon_luder/Data_Setup/Pollen_Datasets/data/final/poleno/combined_test.csv",
     ]
     
     checkpoint_names = [
@@ -233,7 +233,7 @@ if __name__ == "__main__":
             checkpoints, 
             label_file,
             args.embeddings, 
-            train_sizes=args.train_sizes
+            train_sizes=args.max_train_size
         )
 
         for new_eval in results:

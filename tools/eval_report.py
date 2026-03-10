@@ -127,7 +127,7 @@ def run_tests(checkpoints, labels, embeddings=None, ckpt_root="checkpoints", k_f
                     "cv_accuracy_ci_high_95": ci[1],
                     "cv_accuracy_sd": acc_sd,
                     "cv_accuracy_se": acc_se,
-                    
+
                     "k_fold": k_fold,
                     "k_neighbours": k_neighbors,
 
@@ -141,7 +141,7 @@ def run_tests(checkpoints, labels, embeddings=None, ckpt_root="checkpoints", k_f
 if __name__ == "__main__":
 
     labels = [
-        "Z:/simon_luder/Data_Setup/Pollen_Datasets/data/final/poleno/combined_test_20.csv",
+        "Z:/simon_luder/Data_Setup/Pollen_Datasets/data/final/poleno/combined_test.csv",
     ]
     
     checkpoint_names = [
@@ -209,7 +209,7 @@ if __name__ == "__main__":
             checkpoints, 
             label_file,
             args.embeddings, 
-            train_sizes=args.train_sizes,
+            train_sizes=args.max_train_size,
             )
 
         for new_eval in results:
