@@ -106,8 +106,8 @@ def run_tests_species_sizes(
 
         print(f"Dataset contains {n_species} species and {n_samples} samples")
 
-        # compute event retrieval once
-        event_mrr = calc_mrr_pd(df, emb_col="emb", lbl_col="event_id")
+        # # compute event retrieval once
+        # event_mrr = calc_mrr_pd(df, emb_col="emb", lbl_col="event_id")
 
         for train_size in train_sizes:
 
@@ -149,7 +149,6 @@ def run_tests_species_sizes(
                 "k_fold": k_fold,
                 "k_neighbours": k_neighbors,
 
-                "event_mrr": event_mrr,
             }
 
             results.append(result)
