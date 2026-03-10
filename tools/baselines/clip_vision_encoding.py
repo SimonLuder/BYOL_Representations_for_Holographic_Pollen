@@ -136,7 +136,7 @@ if __name__ == "__main__":
     config_updates = {
         "dataset": {
             "root": "Z:/marvel/marvel-fhnw/data/",
-            "labels_test": "data/final/poleno/basic_test_20.csv",
+            "labels_test": "data/final/poleno/basic_test.csv",
         }
     }
 
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     config_updates = {
         "dataset": {
             "root": "Z:/marvel/marvel-fhnw/data/",
-            "labels_test": "data/final/poleno/isolated_test_20.csv",
+            "labels_test": "data/final/poleno/isolated_test.csv",
         }
     }
 

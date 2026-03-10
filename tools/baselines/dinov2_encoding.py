@@ -144,8 +144,8 @@ if __name__ == "__main__":
     # First dataset
     config_updates = {
         "dataset": {
-            "root": "Z:/marvel/marvel-fhnw/data/",
-            "labels_test": "data/final/poleno/basic_test_20.csv",
+            # "root": "Z:/marvel/marvel-fhnw/data/",
+            "labels_test": "data/final/poleno/basic_test.csv",
         }
     }
 
@@ -160,8 +160,8 @@ if __name__ == "__main__":
     # Second dataset
     config_updates = {
         "dataset": {
-            "root": "Z:/marvel/marvel-fhnw/data/",
-            "labels_test": "data/final/poleno/isolated_test_20.csv",
+            # "root": "Z:/marvel/marvel-fhnw/data/",
+            "labels_test": "data/final/poleno/isolated_test.csv",
         }
     }
 
