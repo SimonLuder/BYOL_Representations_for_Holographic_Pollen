@@ -218,7 +218,7 @@ if __name__ == "__main__":
             checkpoints, 
             label_file, 
             args.embeddings, 
-            train_sizes=args.train_sizes
+            train_sizes=args.max_train_size
         )
 
         for new_eval in results:
