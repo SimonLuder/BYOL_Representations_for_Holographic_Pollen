@@ -12,28 +12,9 @@ from typing import List, Tuple, Union
 import scipy.stats as stats
 from ssl_poleno.evaluation.report import EvaluationSummary
 from ssl_poleno.evaluation.mrr import calc_mrr_pd
+from ssl_poleno.evaluation.utils import load_inference_results, limit_events_per_species
 
 from ssl_poleno.evaluation import knn
-
-
-def load_inference_results(filename: str) -> pd.DataFrame:
-    data = np.load(filename)
-
-    def make_repr(emb_key, proj_key, files_key):
-        d = {
-            "emb": data[emb_key].tolist(),
-            "rec_path": data[files_key].tolist(),
-        }
-        if proj_key in data:
-            d["proj"] = data[proj_key].tolist()
-        return pd.DataFrame(d)
-
-    repr1 = make_repr("emb1", "proj1", "files1")
-    repr2 = make_repr("emb2", "proj2", "files2")
-
-    df = pd.concat([repr1, repr2], ignore_index=True)
-    labels_name = data.get("dataset")
-    return df, labels_name
 
 
 def calc_cv_accuracy_ci(fold_acc: List[float]):
@@ -72,7 +53,16 @@ def find_files_by_regex(root_dir: Union[str, Path], pattern: str) -> List[Path]:
     return matches
 
 
-def run_tests(checkpoints, labels, embeddings=None, ckpt_root="checkpoints", k_fold = 5, k_neighbors=10, train_sizes=[100],):
+def run_tests(
+        checkpoints, 
+        labels, 
+        embeddings=None, 
+        ckpt_root="checkpoints", 
+        k_fold = 5, 
+        k_neighbors=10, 
+        train_sizes=[100],
+        mrr_max_events=50,
+    ):
 
     # Load ground truth labels
     test_labels = pd.read_csv(labels)
@@ -111,7 +101,13 @@ def run_tests(checkpoints, labels, embeddings=None, ckpt_root="checkpoints", k_f
                 mean_acc, ci = calc_cv_accuracy_ci(np.array(accuracies))
                 acc_se, acc_sd = calc_sd_se(np.array(accuracies))
 
-                event_mrr = calc_mrr_pd(df, emb_col="emb", lbl_col="event_id")
+                df_mrr = limit_events_per_species(
+                    df,
+                    species_col="species",
+                    event_col="event_id",
+                    max_events=mrr_max_events
+                )
+                event_mrr = calc_mrr_pd(df_mrr, emb_col="emb", lbl_col="event_id")
 
                 version = os.path.basename(os.path.dirname(filename))
 
@@ -132,6 +128,8 @@ def run_tests(checkpoints, labels, embeddings=None, ckpt_root="checkpoints", k_f
                     "k_neighbours": k_neighbors,
 
                     "event_mrr": event_mrr,
+                    "mrr_max_events": mrr_max_events,
+                    "mrr_total_events": len(df_mrr),
                 }
                 results.append(result)
 

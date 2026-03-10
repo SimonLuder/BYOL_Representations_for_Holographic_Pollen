@@ -11,29 +11,10 @@ from collections import Counter
 from typing import List, Tuple, Union
 import scipy.stats as stats
 from ssl_poleno.evaluation.report import EvaluationSummary
-from ssl_poleno.evaluation.mrr import calc_mrr_pd
+from ssl_poleno.evaluation.utils import load_inference_results
 
 from ssl_poleno.evaluation import knn
 
-
-def load_inference_results(filename: str) -> pd.DataFrame:
-    data = np.load(filename)
-
-    def make_repr(emb_key, proj_key, files_key):
-        d = {
-            "emb": data[emb_key].tolist(),
-            "rec_path": data[files_key].tolist(),
-        }
-        if proj_key in data:
-            d["proj"] = data[proj_key].tolist()
-        return pd.DataFrame(d)
-
-    repr1 = make_repr("emb1", "proj1", "files1")
-    repr2 = make_repr("emb2", "proj2", "files2")
-
-    df = pd.concat([repr1, repr2], ignore_index=True)
-    labels_name = data.get("dataset")
-    return df, labels_name
 
 
 def calc_cv_accuracy_ci(fold_acc: List[float]):
@@ -102,9 +83,6 @@ def run_tests_species_sizes(
             n_samples = len(df)
 
             print(f"Dataset contains {n_species} species and {n_samples} samples")
-
-            # # compute event retrieval once
-            # event_mrr = calc_mrr_pd(df, emb_col="emb", lbl_col="event_id")
 
             for train_size in train_sizes:
 

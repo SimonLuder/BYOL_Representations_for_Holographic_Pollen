@@ -46,8 +46,8 @@ def mean_reciprocal_rank(
     emb,
     labels,
     reduction="mean",
-    batch_size=512,
-):
+    batch_size=4096,
+    ):
     """
     Memory-efficient MRR computation.
 
