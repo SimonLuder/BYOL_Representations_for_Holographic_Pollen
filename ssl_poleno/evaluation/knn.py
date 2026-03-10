@@ -72,11 +72,46 @@ def balance_training_set(
     )
 
 
+def sample_training_set_per_class(
+    X,
+    y,
+    event_ids,
+    n_per_class,
+    rng
+):
+    """
+    Randomly sample up to n_per_class samples per class.
+    """
+
+    classes = np.unique(y)
+
+    X_out = []
+    y_out = []
+    event_out = []
+
+    for c in classes:
+        idx = np.where(y == c)[0]
+
+        if len(idx) > n_per_class:
+            idx = rng.choice(idx, size=n_per_class, replace=False)
+
+        X_out.append(X[idx])
+        y_out.append(y[idx])
+        event_out.append(event_ids[idx])
+
+    X_out = np.vstack(X_out)
+    y_out = np.concatenate(y_out)
+    event_out = np.concatenate(event_out)
+
+    return X_out, y_out, event_out
+
+
 def evaluate_embeddings_knn_cv(
     df: pd.DataFrame,
     y_col: str = "species",
     k: int = 5,
     n_splits: int = 5,
+    train_samples_per_class: int = None,
     random_state: int = 42,
     ) -> Tuple[
     List[np.ndarray],
@@ -116,12 +151,24 @@ def evaluate_embeddings_knn_cv(
         y_train, y_test = y[train_idx], y[test_idx]
         event_train, event_test = event_ids[train_idx], event_ids[test_idx]
 
-        # Balance training set
-        X_train, y_train, event_train, min_n = balance_training_set(
-            X_train, y_train, event_train, rng
-        )
+        # Subsample Training set
+        if train_samples_per_class is not None:
+            X_train, y_train, event_train = sample_training_set_per_class(
+                X_train,
+                y_train,
+                event_train,
+                train_samples_per_class,
+                rng
+            )
+            print(f"Training with {train_samples_per_class} samples per class")
+        else:
+            # Balance training set
+            X_train, y_train, event_train, min_n = balance_training_set(
+                X_train, y_train, event_train, rng
+            )
+            print(f"Set test set to {min_n}")
 
-        print(f"Set test set to {min_n}")
+       
 
         # Predict
         preds = knn_predict_with_event_mask(
