@@ -60,20 +60,6 @@ def calc_sd_se(fold_acc: List[float]):
     return sd, se
 
 
-def find_files_by_regex(root_dir: Union[str, Path], pattern: str) -> List[Path]:
-    root_dir = Path(root_dir)
-    regex = re.compile(pattern)
-
-    matches = []
-    for path in root_dir.rglob("*"):
-        if path.is_file() and regex.fullmatch(path.name):
-            matches.append(path)
-
-    return matches
-
-
-
-
 def split_species_groups(df: pd.DataFrame, col="species_norm", n_groups=5, seed=42):
     species = df[col].unique()
 
@@ -86,23 +72,22 @@ def split_species_groups(df: pd.DataFrame, col="species_norm", n_groups=5, seed=
 def run_tests_species_subset(
         checkpoints,
         labels,
+        embeddings,
         ckpt_root="checkpoints",
         k_fold=5,
         k_neighbors=10,
-        n_species_groups=6
+        n_species_groups=6,
+        train_sizes=[100],
 ):
 
     test_labels = pd.read_csv(labels)
     results = []
 
     for checkpoint in checkpoints:
-
-        files = find_files_by_regex(
-            root_dir=os.path.join(ckpt_root, checkpoint),
-            pattern=r"inference_.*\.npz"
-        )
-
-        for filename in files:
+        
+        for embedding in embeddings:
+            
+            filename = os.path.join(ckpt_root, checkpoint, embedding)
 
             print(f"Calculate representations for file: {filename}")
 
@@ -129,41 +114,51 @@ def run_tests_species_subset(
                     f"with {len(species_subset)} species and {len(df_subset)} samples"
                 )
 
-                out = knn.evaluate_embeddings_knn_cv(
-                    df_subset,
-                    y_col="species",
-                    k=k_neighbors,
-                    n_splits=k_fold
-                )
+                for train_size in train_sizes:
 
-                predictions, true_labels, test_indices, accuracies = out
+                    print(
+                    f"Running kNN with max {train_size} training samples per class"
+                    )
 
-                mean_acc, ci = calc_cv_accuracy_ci(np.array(accuracies))
-                acc_sd, acc_se = calc_sd_se(np.array(accuracies))
+                    out = knn.evaluate_embeddings_knn_cv(
+                        df_subset,
+                        y_col="species",
+                        k=k_neighbors,
+                        n_splits=k_fold,
+                        train_samples_per_class=train_size,
+                    )
 
-                event_mrr = calc_mrr_pd(df_subset, emb_col="emb", lbl_col="event_id")
+                    predictions, true_labels, test_indices, accuracies = out
 
-                result = {
-                    "checkpoint": checkpoint,
-                    "version": version,
-                    "labels": labels_name,
+                    mean_acc, ci = calc_cv_accuracy_ci(np.array(accuracies))
+                    acc_sd, acc_se = calc_sd_se(np.array(accuracies))
 
-                    "species_group": group_idx,
-                    "species_in_group": len(species_subset),
-                    "samples_in_group": len(df_subset),
+                    event_mrr = calc_mrr_pd(df_subset, emb_col="emb", lbl_col="event_id")
 
-                    "mean_cv_accuracy": mean_acc,
-                    "cv_accuracy_ci_low_95": ci[0],
-                    "cv_accuracy_ci_high_95": ci[1],
-                    "cv_accuracy_sd": acc_sd,
-                    "cv_accuracy_se": acc_se,
+                    result = {
+                        "checkpoint": checkpoint,
+                        "version": version,
+                        "labels": labels_name,
 
-                    "k_fold": k_fold,
-                    "k_neighbours": k_neighbors,
-                    "event_mrr": event_mrr,
-                }
+                        "train_samples_per_class": train_size,
 
-                results.append(result)
+                        "species_group": group_idx,
+                        "species_in_group": len(species_subset),
+                        "samples_in_group": len(df_subset),
+
+                        "mean_cv_accuracy": mean_acc,
+                        "cv_accuracy_ci_low_95": ci[0],
+                        "cv_accuracy_ci_high_95": ci[1],
+                        "cv_accuracy_sd": acc_sd,
+                        "cv_accuracy_se": acc_se,
+
+                        "k_fold": k_fold,
+                        "k_neighbours": k_neighbors,
+
+                        "event_mrr": event_mrr,
+                    }
+
+                    results.append(result)
 
     return results
 
@@ -175,10 +170,9 @@ if __name__ == "__main__":
     ]
     
     checkpoint_names = [
-        "byol_lit_20260129_235610",
-        "byol_lit_20260205_131039",
-        "byol_lit_20260202_232449",
-        "byol_lit_20260204_105645",
+        "byol_lit_20260204_152517",
+        "simsiam_lit_20260217_151853",
+        "vicreg_lit_20260206_160405",
     ]
 
     baselines = [
@@ -210,6 +204,22 @@ if __name__ == "__main__":
         type=str, 
         help='List of test labels'
     )
+
+    parser.add_argument(
+        '--embeddings', 
+        default=["inference/knn/inference_basic_test.npz"], 
+        type=str, 
+        nargs='+', 
+        help='List of embeddings files'
+    )
+
+    parser.add_argument(
+        '--max_train_size', 
+        default=[100,], 
+        type=int, 
+        nargs='+', 
+        help='Max nr of reference labels per species for knn'
+    )
     
     args = parser.parse_args()
 
@@ -219,7 +229,12 @@ if __name__ == "__main__":
 
     eval_idx = 0
     for label_file in args.labels:
-        results = run_tests_species_subset(checkpoints, label_file)
+        results = run_tests_species_subset(
+            checkpoints, 
+            label_file,
+            args.embeddings, 
+            train_sizes=args.train_sizes
+        )
 
         for new_eval in results:
             new_eval["labels_file"] = label_file 

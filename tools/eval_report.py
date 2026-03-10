@@ -72,7 +72,7 @@ def find_files_by_regex(root_dir: Union[str, Path], pattern: str) -> List[Path]:
     return matches
 
 
-def run_tests(checkpoints, labels, ckpt_root="checkpoints", k_fold = 5, k_neighbors=10):
+def run_tests(checkpoints, labels, embeddings=None, ckpt_root="checkpoints", k_fold = 5, k_neighbors=10, train_sizes=[100],):
 
     # Load ground truth labels
     test_labels = pd.read_csv(labels)
@@ -80,12 +80,15 @@ def run_tests(checkpoints, labels, ckpt_root="checkpoints", k_fold = 5, k_neighb
     results = []
     for checkpoint in checkpoints:
 
-        files = find_files_by_regex(
-            root_dir=os.path.join(ckpt_root, checkpoint), 
-            pattern=r"inference_.*\.npz"
-        )
+        if embeddings is None:
+            embeddings = find_files_by_regex(
+                root_dir=os.path.join(ckpt_root, checkpoint), 
+                pattern=r"inference_.*\.npz"
+            )
 
-        for filename in files:
+        for embedding in embeddings:
+
+            filename = os.path.join(ckpt_root, checkpoint, embedding)
             print(f"Calculate respresentations for file: {filename}")
             # filename = f"{ckpt_root}/{checkpoint}/inference/inference_last.npz"
             representations, labels_name = load_inference_results(filename)
@@ -93,30 +96,44 @@ def run_tests(checkpoints, labels, ckpt_root="checkpoints", k_fold = 5, k_neighb
             df = pd.merge(representations, test_labels, on="rec_path", how='inner')
             df = df.sort_values(["species", "event_id"]).reset_index(drop=True)
 
-            out = knn.evaluate_embeddings_knn_cv(df, y_col="species", k=k_neighbors, n_splits=k_fold)
-            predictions, true_labels, test_indices, accuracies = out
+            for train_size in train_sizes:
 
-            mean_acc, ci = calc_cv_accuracy_ci(np.array(accuracies))
-            acc_se, acc_sd = calc_sd_se(np.array(accuracies))
+                out = knn.evaluate_embeddings_knn_cv(
+                    df, 
+                    y_col="species", 
+                    k=k_neighbors, 
+                    n_splits=k_fold,
+                    train_samples_per_class=train_size,
+                )
 
-            event_mrr = calc_mrr_pd(df, emb_col="emb", lbl_col="event_id")
+                predictions, true_labels, test_indices, accuracies = out
 
-            version = os.path.basename(os.path.dirname(filename))
+                mean_acc, ci = calc_cv_accuracy_ci(np.array(accuracies))
+                acc_se, acc_sd = calc_sd_se(np.array(accuracies))
 
-            result = {
-                "checkpoint": checkpoint,
-                "version": version,
-                "labels": labels_name,
-                "mean_cv_accuracy": mean_acc,
-                "cv_accuracy_ci_low_95": ci[0],
-                "cv_accuracy_ci_high_95": ci[1],
-                "cv_accuracy_sd": acc_sd,
-                "cv_accuracy_se": acc_se,
-                "k_fold": k_fold,
-                "k_neighbours": k_neighbors,
-                "event_mrr": event_mrr,
-            }
-            results.append(result)
+                event_mrr = calc_mrr_pd(df, emb_col="emb", lbl_col="event_id")
+
+                version = os.path.basename(os.path.dirname(filename))
+
+                result = {
+                    "checkpoint": checkpoint,
+                    "version": version,
+                    "labels": labels_name,
+
+                    "train_samples_per_class": train_size,
+
+                    "mean_cv_accuracy": mean_acc,
+                    "cv_accuracy_ci_low_95": ci[0],
+                    "cv_accuracy_ci_high_95": ci[1],
+                    "cv_accuracy_sd": acc_sd,
+                    "cv_accuracy_se": acc_se,
+                    
+                    "k_fold": k_fold,
+                    "k_neighbours": k_neighbors,
+
+                    "event_mrr": event_mrr,
+                }
+                results.append(result)
 
     return results
 
@@ -163,6 +180,22 @@ if __name__ == "__main__":
         type=str, 
         help='List of test labels'
     )
+
+    parser.add_argument(
+        '--embeddings', 
+        default=["inference/knn/inference_basic_test.npz"], 
+        type=str, 
+        nargs='+', 
+        help='List of embeddings files'
+    )
+
+    parser.add_argument(
+        '--max_train_size', 
+        default=[100,], 
+        type=int, 
+        nargs='+', 
+        help='Max nr of reference labels per species for knn'
+    )
     
     args = parser.parse_args()
 
@@ -172,7 +205,12 @@ if __name__ == "__main__":
 
     eval_idx = 0
     for label_file in args.labels:
-        results = run_tests(checkpoints, label_file)
+        results = run_tests(
+            checkpoints, 
+            label_file,
+            args.embeddings, 
+            train_sizes=args.train_sizes,
+            )
 
         for new_eval in results:
             new_eval["labels_file"] = label_file 

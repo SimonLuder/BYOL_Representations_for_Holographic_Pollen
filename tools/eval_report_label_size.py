@@ -77,7 +77,7 @@ def run_tests_species_sizes(
         ckpt_root="checkpoints",
         k_fold=5,
         k_neighbors=10,
-        train_sizes=[10, 20, 40, 80, 120, 160],
+        train_sizes=[10, 20, 40, 80, 160],
 ):
 
     test_labels = pd.read_csv(labels)
@@ -109,7 +109,7 @@ def run_tests_species_sizes(
             for train_size in train_sizes:
 
                 print(
-                    f"Running kNN with {train_size} training samples per class"
+                    f"Running kNN with max {train_size} training samples per class"
                 )
 
                 out = knn.evaluate_embeddings_knn_cv(
@@ -117,7 +117,7 @@ def run_tests_species_sizes(
                     y_col="species",
                     k=k_neighbors,
                     n_splits=k_fold,
-                    train_samples_per_class=train_size
+                    train_samples_per_class=train_size,
                 )
 
                 predictions, true_labels, test_indices, accuracies = out
@@ -197,6 +197,14 @@ if __name__ == "__main__":
         nargs='+', 
         help='List of embeddings files'
     )
+
+    parser.add_argument(
+        '--max_train_size', 
+        default=[10, 20, 40, 80, 160, 320], 
+        type=int, 
+        nargs='+', 
+        help='Max nr of reference labels per species for knn'
+    )
     
     args = parser.parse_args()
 
@@ -206,7 +214,12 @@ if __name__ == "__main__":
 
     eval_idx = 0
     for label_file in args.labels:
-        results = run_tests_species_sizes(checkpoints, label_file, args.embeddings)
+        results = run_tests_species_sizes(
+            checkpoints, 
+            label_file, 
+            args.embeddings, 
+            train_sizes=args.train_sizes
+        )
 
         for new_eval in results:
             new_eval["labels_file"] = label_file 
