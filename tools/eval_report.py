@@ -75,6 +75,7 @@ def run_tests(
         for embedding in embeddings:
 
             filename = os.path.join(ckpt_root, checkpoint, embedding)
+            version = os.path.basename(os.path.dirname(filename))
             pred_dir = os.path.join(ckpt_root, checkpoint, "predictions")
             print(f"Calculate respresentations for file: {filename}")
 
@@ -127,8 +128,6 @@ def run_tests(
                     event_ids=test_meta["event_id"].values,
                     rec_paths=test_meta["rec_path"].values,
                 )
-
-                version = os.path.basename(os.path.dirname(filename))
 
                 result = {
                     "checkpoint": checkpoint,
