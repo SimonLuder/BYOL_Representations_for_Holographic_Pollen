@@ -95,6 +95,11 @@ def run_tests(
 
                 predictions, true_labels, test_indices, accuracies = out
 
+                # Flatten CV folds
+                predictions = np.concatenate(predictions)
+                true_labels = np.concatenate(true_labels)
+                flat_indices = np.concatenate(test_indices)
+
                 mean_acc, ci = calc_cv_accuracy_ci(np.array(accuracies))
                 acc_se, acc_sd = calc_sd_se(np.array(accuracies))
 
