@@ -116,7 +116,7 @@ def run_tests(
                 # Save predictions
                 test_meta = df.iloc[flat_indices][["species", "event_id", "rec_path"]].reset_index(drop=True)
                 os.makedirs(pred_dir, exist_ok=True)
-                pred_file = os.path.join(pred_dir, f"{version}_train{train_size}.npz")
+                pred_file = os.path.join(pred_dir, f"{version}_{labels_name}_{train_size}.npz")
 
                 np.savez(
                     pred_file,
