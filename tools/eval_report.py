@@ -4,10 +4,6 @@ import argparse
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from sklearn.preprocessing import normalize
-from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics.pairwise import cosine_similarity
-from collections import Counter
 from typing import List, Tuple, Union
 import scipy.stats as stats
 from ssl_poleno.evaluation.report import EvaluationSummary
@@ -79,8 +75,9 @@ def run_tests(
         for embedding in embeddings:
 
             filename = os.path.join(ckpt_root, checkpoint, embedding)
+            pred_dir = os.path.join(ckpt_root, checkpoint, "predictions")
             print(f"Calculate respresentations for file: {filename}")
-            # filename = f"{ckpt_root}/{checkpoint}/inference/inference_last.npz"
+
             representations, labels_name = load_inference_results(filename)
 
             df = pd.merge(representations, test_labels, on="rec_path", how='inner')
@@ -109,6 +106,23 @@ def run_tests(
                 )
                 event_mrr = calc_mrr_pd(df_mrr, emb_col="emb", lbl_col="event_id")
 
+
+                # Save predictions
+                test_meta = df.iloc[test_indices][["species", "event_id", "rec_path"]].reset_index(drop=True)
+                os.makedirs(pred_dir, exist_ok=True)
+                pred_file = os.path.join(pred_dir, f"{version}_train{train_size}.npz")
+
+                np.savez(
+                    pred_file,
+                    predictions=predictions,
+                    true_labels=true_labels,
+                    test_indices=test_indices,
+                    accuracies=np.array(accuracies),
+                    species=test_meta["species"].values,
+                    event_ids=test_meta["event_id"].values,
+                    rec_paths=test_meta["rec_path"].values,
+                )
+
                 version = os.path.basename(os.path.dirname(filename))
 
                 result = {
@@ -130,6 +144,8 @@ def run_tests(
                     "event_mrr": event_mrr,
                     "mrr_max_events": mrr_max_events,
                     "mrr_total_events": len(df_mrr),
+
+                    "predictions_file": pred_file,
                 }
                 results.append(result)
 
@@ -203,7 +219,7 @@ if __name__ == "__main__":
             label_file,
             args.embeddings, 
             train_sizes=args.max_train_size,
-            )
+        )
 
         for new_eval in results:
             new_eval["labels_file"] = label_file 
