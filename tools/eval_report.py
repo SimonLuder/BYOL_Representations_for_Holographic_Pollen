@@ -113,7 +113,7 @@ def run_tests(
 
 
                 # Save predictions
-                test_meta = df.iloc[test_indices][["species", "event_id", "rec_path"]].reset_index(drop=True)
+                test_meta = df.iloc[flat_indices][["species", "event_id", "rec_path"]].reset_index(drop=True)
                 os.makedirs(pred_dir, exist_ok=True)
                 pred_file = os.path.join(pred_dir, f"{version}_train{train_size}.npz")
 
@@ -121,7 +121,7 @@ def run_tests(
                     pred_file,
                     predictions=predictions,
                     true_labels=true_labels,
-                    test_indices=test_indices,
+                    test_indices=flat_indices,
                     accuracies=np.array(accuracies),
                     species=test_meta["species"].values,
                     event_ids=test_meta["event_id"].values,
