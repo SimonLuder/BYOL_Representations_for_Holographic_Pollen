@@ -1,8 +1,8 @@
-# Self-Supervised Representations for Holographic Pollen
+# Self-Supervised Representation Learning for Holographic Pollen
 
-Repository to train self-supervised image encoders for holographic pollen data. This repository implements a PyTorch based training pipeline for self-supervised learning of image encoders to create image labels without explicit supervision.
+This repository provides a PyTorch-based training pipeline for learning self-supervised image representations on holographic pollen data. The goal is to train image encoders that can generate meaningful representations without requiring explicit labels.
 
-The following methods are currently supported:
+The following self-supervised learning methods are currently implemented:
 
 - Bootstrap Your Own Latents (BYOL) \[ [arXiv](https://arxiv.org/abs/2006.07733) \]
 - Simple Siamese Representation Learning (SimSiam) \[ [arXiv](https://arxiv.org/abs/2011.10566) \]
@@ -24,6 +24,8 @@ The following methods are currently supported:
 
 ## Usage
 
+The training can be run locally:
+
 ```powershell
 # BYOL
 python -m tools.train_lightning --config config/base_byol_dual_config.yaml
@@ -35,30 +37,37 @@ python -m tools.train_lightning --config config/base_simsiam_dual_config.yaml
 python -m tools.train_lightning --config config/base_vicreg_dual_config.yaml
 ```
 
-## Docker
+## Setup
+
+### Option 1: Local (pip)
+
+```bash
+pip install -r requirements.txt
+```
+
+## Option 2: Docker
 
 Build the docker image the with:
-```
-docker build -f ./dockerfile/dockerfile.slurm -t byol_training .
+```bash
+docker build -f ./dockerfile/dockerfile.slurm -t ssl_training .
 ```
 
 After building, start the container on any shell with:
-```
-docker run -it --rm -v .:/app -w /app --gpus all --env WANDB_API_KEY=$(cat wandb_api_key.secret) byol_training bash
-```
-
-## SLURM
-Create tar file for export to slurm
-```
-docker save byol_training -o byol_training.tar
-```
-
-Start interative session
-```
-srun -p performance -t 60 --pty bash
+```bash
+docker run -it --rm \
+  -v $(pwd):/app \
+  -w /app \
+  --gpus all \
+  --env-file .env \
+  ssl_training bash
 ```
 
-Create singularity container
+### Option 3: SLURM + Singularity
+
+```bash
+cd /path/to/repo
+srun -p performance -t 60 --mem=32G --pty bash
+singularity build --fakeroot ../ssl_training.sif dockerfile/ssl_setup.def
 ```
-singularity build --fakeroot --sandbox byol_sandbox docker-archive://byol_training.tar
-```
+
+For full instructions, see [SLURM Setup](slurm/README.md)
