@@ -7,6 +7,7 @@ __pycache__/
 *.pyc
 *.pyo
 
+.venv/
 models/
 checkpoints/
 images/

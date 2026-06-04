@@ -33,7 +33,7 @@ cd repo
 singularity build --fakeroot ../ssl_training.sif dockerfile/ssl_setup.def
 ```
 
-This creates a `byol_training.sif` container outside the repository which is used by the setup files in the subfolders.
+This creates a `ssl_training.sif` container outside the repository which is used by the setup files in the subfolders.
 
 ---
 

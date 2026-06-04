@@ -5,29 +5,48 @@ from typing import Optional
 from torchvision import models
 
 
-def get_backbone(name: str, pretrained: bool = True):
+def get_backbone(name: str, pretrained: bool = True) -> torch.nn.Module:
     """
     Returns a torchvision backbone given its name.
-    
+
     Args:
-        name (str): Model name, e.g. 'resnet18', 'resnet50', 'mobilenet_v3_small'.
+        name (str): Model name, e.g. 'resnet18', 'resnet50', 'efficientnet_b0'.
         pretrained (bool): Whether to use pretrained ImageNet weights.
-    
+
     Returns:
         torch.nn.Module: The model backbone.
     """
-    # Mapper for torchvision constructors and weights
     backbone_constructors = {
+        # ResNet
         "resnet18": (models.resnet18, models.ResNet18_Weights.DEFAULT),
         "resnet34": (models.resnet34, models.ResNet34_Weights.DEFAULT),
         "resnet50": (models.resnet50, models.ResNet50_Weights.DEFAULT),
-    } # Add more models as needed
+
+        # EfficientNet B-series
+        "efficientnet_b0": (models.efficientnet_b0, models.EfficientNet_B0_Weights.DEFAULT),
+        "efficientnet_b1": (models.efficientnet_b1, models.EfficientNet_B1_Weights.DEFAULT),
+        "efficientnet_b2": (models.efficientnet_b2, models.EfficientNet_B2_Weights.DEFAULT),
+        "efficientnet_b3": (models.efficientnet_b3, models.EfficientNet_B3_Weights.DEFAULT),
+        "efficientnet_b4": (models.efficientnet_b4, models.EfficientNet_B4_Weights.DEFAULT),
+        "efficientnet_b5": (models.efficientnet_b5, models.EfficientNet_B5_Weights.DEFAULT),
+        "efficientnet_b6": (models.efficientnet_b6, models.EfficientNet_B6_Weights.DEFAULT),
+        "efficientnet_b7": (models.efficientnet_b7, models.EfficientNet_B7_Weights.DEFAULT),
+
+        # EfficientNet V2
+        "efficientnet_v2_s": (models.efficientnet_v2_s, models.EfficientNet_V2_S_Weights.DEFAULT),
+        "efficientnet_v2_m": (models.efficientnet_v2_m, models.EfficientNet_V2_M_Weights.DEFAULT),
+        "efficientnet_v2_l": (models.efficientnet_v2_l, models.EfficientNet_V2_L_Weights.DEFAULT),
+    }
 
     if name not in backbone_constructors:
-        raise ValueError(f"Unsupported backbone '{name}'. Available: {list(backbone_constructors.keys())}")
-    
+        raise ValueError(
+            f"Unsupported backbone '{name}'. "
+            f"Available: {list(backbone_constructors.keys())}"
+        )
+
     constructor, weights = backbone_constructors[name]
     model = constructor(weights=weights if pretrained else None)
+
     return model
     
 
